@@ -7,6 +7,7 @@ async function gerarRelatorioPDF() {
   const contratos = await listarContratos();
   const stats = await obterEstatisticas();
   
+  const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   let y = 20;
   
@@ -167,3 +168,4 @@ function mostrarNotificacao(mensagem, tipo = 'info') {
   
   setTimeout(() => notif.remove(), 3000);
 }
+
