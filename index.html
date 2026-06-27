@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AmBev Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #f8f9fa;
+      color: #1a1a1a;
+    }
+    
+    .header {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1a1a1a;
+      letter-spacing: -0.5px;
+    }
+    
+    .logo-sub {
+      font-size: 11px;
+      color: #666;
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    
+    .nav-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #e0e0e0;
+      background: white;
+      overflow-x: auto;
+      position: sticky;
+      top: 80px;
+      z-index: 99;
+    }
+    
+    .nav-tab {
+      padding: 16px 24px;
+      border: none;
+      background: white;
+      cursor: pointer;
+      font-weight: 500;
+      color: #666;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+    
+    .nav-tab:hover {
+      color: #1a1a1a;
+      background: #fafafa;
+    }
+    
+    .nav-tab.active {
+      color: #1a1a1a;
+      border-bottom-color: #1a1a1a;
+      background: white;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px 30px;
+    }
+    
+    .page {
+      display: none;
+    }
+    
+    .page.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .stat-box {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      transition: all 0.3s ease;
+    }
+    
+    .stat-box:hover {
+      border-color: #1a1a1a;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+    }
+    
+    .stat-label {
+      font-size: 13px;
+      color: #666;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .card {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.3s ease;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #1a1a1a;
+      box-shadow: 0 0 0 3px rgba(26,26,26,0.08);
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: #1a1a1a;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #000;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(26,26,26,0.2);
+    }
+    
+    .btn-secondary {
+      background: white;
+      color: #1a1a1a;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .btn-secondary:hover {
+      background: #fafafa;
+      border-color: #1a1a1a;
+    }
+    
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+    
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      background: #fafafa;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      transition: all 0.3s ease;
+    }
+    
+    .item:hover {
+      border-color: #1a1a1a;
+      background: white;
+    }
+    
+    .item-info {
+      flex: 1;
+    }
+    
+    .item-name {
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+    
+    .item-detail {
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .item-action {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .badge-warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .badge-danger {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .progress {
+      width: 100%;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: #1a1a1a;
+      transition: width 0.3s ease;
+    }
+    
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 20px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .notification.success {
+      color: #065f46;
+      border-color: #d1fae5;
+      background: #f0fdf4;
+    }
+    
+    .notification.error {
+      color: #991b1b;
+      border-color: #fee2e2;
+      background: #fef2f2;
+    }
+    
+    @media (max-width: 768px) {
+      .header {
+        padding: 16px 20px;
+      }
+      
+      .container {
+        padding: 20px;
+      }
+      
+      .nav-tab {
+        padding: 14px 16px;
+        font-size: 13px;
+      }
+      
+      .stat-value {
+        font-size: 28px;
+      }
+      
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="logo">AmBev</div>
+      <div class="logo-sub">Control</div>
+    </div>
+    <div style="display: flex; gap: 12px;">
+      <button onclick="copiarMensagemWhatsApp()" class="btn btn-primary">
+        💬 WhatsApp
+      </button>
+    </div>
+  </div>
+  
+  <!-- NAVEGAÇÃO -->
+  <div class="nav-tabs">
+    <button onclick="ativarPagina('dashboard')" class="nav-tab active" data-tab="dashboard">
+      📊 Dashboard
+    </button>
+    <button onclick="ativarPagina('produtos')" class="nav-tab" data-tab="produtos">
+      📦 Produtos
+    </button>
+    <button onclick="ativarPagina('estoque')" class="nav-tab" data-tab="estoque">
+      📈 Estoques
+    </button>
+    <button onclick="ativarPagina('validades')" class="nav-tab" data-tab="validades">
+      ⏰ Validades
+    </button>
+    <button onclick="ativarPagina('contratos')" class="nav-tab" data-tab="contratos">
+      📋 Contratos
+    </button>
+    <button onclick="ativarPagina('calculadora')" class="nav-tab" data-tab="calculadora">
+      🧮 Calc
+    </button>
+    <button onclick="ativarPagina('relatorios')" class="nav-tab" data-tab="relatorios">
+      📄 Relatórios
+    </button>
+  </div>
+  
+  <!-- PÁGINAS -->
+  <div class="container">
+    
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="page active">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Dashboard</h1>
+      
+      <div class="grid-2">
+        <div class="stat-box">
+          <div class="stat-value" id="totalProdutos">0</div>
+          <div class="stat-label">📦 Produtos</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="estoqueLojaQtd">0</div>
+          <div class="stat-label">🏪 Estoque Loja</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="estoqueDepositoQtd">0</div>
+          <div class="stat-label">🏢 Estoque Depósito</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="produtosVencendo">0</div>
+          <div class="stat-label">⚠️ Vencendo</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="produtosVencidos">0</div>
+          <div class="stat-label">❌ Vencidos</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="percentualCumprimento">0%</div>
+          <div class="stat-label">✅ Contratos OK</div>
+        </div>
+      </div>
+      
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">📋 Contratos Ativos</div>
+          <div id="contratosList" style="max-height: 500px; overflow-y: auto;">
+            <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">⏳ Próximos Vencimentos</div>
+          <div id="proximosVencimentos" style="max-height: 500px; overflow-y: auto;">
+            <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- PRODUTOS -->
+    <div id="produtos" class="page">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Produtos</h1>
+      
+      <div class="card">
+        <div class="card-title">Adicionar Novo Produto</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label class="form-label">Nome</label>
+            <input type="text" id="nomeProduto" placeholder="Nome do produto">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Marca</label>
+            <input type="text" id="marcaProduto" placeholder="Marca">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoria</label>
+            <input type="text" id="categoriaProduto" placeholder="Categoria (opcional)">
+          </div>
+        </div>
+        <button onclick="adicionarProdutoUI()" class="btn btn-primary">Adicionar</button>
+      </div>
+      
+      <div class="card">
+        <div class="card-title">Lista de Produtos</div>
+        <div id="listaProdutos" class="item-list">
+          <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- ESTOQUES -->
+    <div id="estoque" class="page">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Estoques</h1>
+      
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">🏪 Estoque da Loja</div>
+          <div id="estoqueLojaUI" class="item-list">
+            <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">🏢 Estoque do Depósito</div>
+          <div id="estoqueDepositoUI" class="item-list">
+            <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- VALIDADES -->
+    <div id="validades" class="page">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Validades</h1>
+      
+      <div class="card">
+        <div class="card-title">Registrar Validade</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label class="form-label">Produto</label>
+            <select id="produtoValidadeSelect"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Validade</label>
+            <input type="date" id="dataValidadeInput">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantidade</label>
+            <input type="number" id="qtdValidadeInput" placeholder="Quantidade">
+          </div>
+        </div>
+        <button onclick="adicionarValidadeUI()" class="btn btn-primary">Registrar</button>
+      </div>
+      
+      <div class="card">
+        <div class="card-title">Produtos por Validade</div>
+        <div id="listaValidades" class="item-list">
+          <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- CONTRATOS -->
+    <div id="contratos" class="page">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Contratos</h1>
+      
+      <div class="card">
+        <div class="card-title">Novo Contrato</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label class="form-label">Nome</label>
+            <input type="text" id="nomeContrato" placeholder="Nome do contrato">
+          </div>
+          <div class="form-group">
+            <label class="form-label">% Contratado</label>
+            <input type="number" id="percentualContratado" placeholder="Percentual">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select id="tipoContrato">
+              <option value="">Selecione...</option>
+              <option value="frente">Frente</option>
+              <option value="prateleira">Prateleira</option>
+              <option value="modulo">Módulo</option>
+              <option value="ponto_extra">Ponto Extra</option>
+              <option value="geladeira">Geladeira</option>
+              <option value="ilha">Ilha Promocional</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="adicionarContratoUI()" class="btn btn-primary">Adicionar</button>
+      </div>
+      
+      <div class="card">
+        <div class="card-title">Contratos Cadastrados</div>
+        <div id="listaContratos" class="item-list">
+          <p style="color: #999; text-align: center; padding: 20px;">Carregando...</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- CALCULADORA -->
+    <div id="calculadora" class="page">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Calculadora</h1>
+      
+      <div class="card" style="max-width: 500px;">
+        <div class="card-title">Calcular Contrato</div>
+        
+        <div class="form-group">
+          <label class="form-label">Quantidade</label>
+          <input type="number" id="calcQuantidade" placeholder="Digite a quantidade">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Percentual (%)</label>
+          <input type="number" id="calcPercentual" placeholder="Digite o percentual" step="0.1">
+        </div>
+        
+        <button onclick="calcularFormula()" class="btn btn-primary" style="width: 100%; margin-bottom: 20px;">
+          Calcular
+        </button>
+        
+        <div style="background: #1a1a1a; color: white; padding: 24px; border-radius: 8px; text-align: center;">
+          <div style="font-size: 12px; color: #999; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">Resultado</div>
+          <div id="resultadoCalc" style="font-size: 48px; font-weight: 700; margin-bottom: 12px;">0</div>
+          <div style="font-size: 12px; color: #999;">Fórmula: (Qtd × %) ÷ 100</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- RELATÓRIOS -->
+    <div id="relatorios" class="page">
+      <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 30px;">Relatórios</h1>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        <div class="card">
+          <div class="card-title">📄 Gerar PDF</div>
+          <p style="color: #666; font-size: 13px; margin-bottom: 16px;">Crie um relatório completo em PDF com todos os dados da loja.</p>
+          <button onclick="gerarRelatorioPDF()" class="btn btn-primary" style="width: 100%;">Gerar PDF</button>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">💬 WhatsApp</div>
+          <p style="color: #666; font-size: 13px; margin-bottom: 16px;">Copie uma mensagem formatada para enviar pelo WhatsApp com todos os dados.</p>
+          <button onclick="copiarMensagemWhatsApp()" class="btn btn-primary" style="width: 100%;">Copiar Mensagem</button>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <script src="relatorios.js"></script>
+  <script>
+    // Navegação entre abas
+    function ativarPagina(pagina) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      
+      document.getElementById(pagina).classList.add('active');
+      document.querySelector(`[data-tab="${pagina}"]`).classList.add('active');
+      
+      carregarDadosPagina(pagina);
+    }
+    
+    async function carregarDadosPagina(pagina) {
+      try {
+        if (pagina === 'dashboard') await atualizarDashboard();
+        else if (pagina === 'produtos') await atualizarListaProdutos();
+        else if (pagina === 'estoque') await atualizarEstoques();
+        else if (pagina === 'validades') {
+          await atualizarListaValidades();
+          await preencherSelectProdutosValidades();
+        }
+        else if (pagina === 'contratos') await atualizarListaContratos();
+      } catch (error) {
+        console.error('Erro:', error);
+      }
+    }
+    
+    // DASHBOARD
+    async function atualizarDashboard() {
+      const stats = await obterEstatisticas();
+      const contratos = await listarContratos();
+      const validades = await listarValidadesDB();
+      
+      document.getElementById('totalProdutos').textContent = stats.totalProdutos;
+      document.getElementById('estoqueLojaQtd').textContent = stats.estoqueLojaQtd;
+      document.getElementById('estoqueDepositoQtd').textContent = stats.estoqueDepositoQtd;
+      document.getElementById('produtosVencendo').textContent = stats.produtosVencendo;
+      document.getElementById('produtosVencidos').textContent = stats.produtosVencidos;
+      document.getElementById('percentualCumprimento').textContent = stats.percentualCumprimento + '%';
+      
+      // Contratos
+      const contratosAtivos = contratos.filter(c => c.status === 'ativo');
+      let html = '';
+      contratosAtivos.forEach(c => {
+        const pct = Math.round((c.percentual_atual / c.percentual_contratado) * 100);
+        const ok = pct >= 100;
+        html += `
+          <div class="item">
+            <div class="item-info">
+              <div class="item-name">${c.nome}</div>
+              <div class="item-detail">${c.tipo}</div>
+            </div>
+            <div class="item-action">
+              <span class="badge ${ok ? 'badge-success' : 'badge-warning'}">${pct}%</span>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('contratosList').innerHTML = html || '<p style="color: #999; text-align: center; padding: 20px;">Nenhum contrato ativo</p>';
+      
+      // Vencimentos
+      const hoje = new Date();
+      const proximosDias = new Date();
+      proximosDias.setDate(proximosDias.getDate() + 7);
+      
+      const vencendo = validades.filter(v => {
+        const data = new Date(v.data_validade);
+        return data >= hoje && data <= proximosDias;
+      }).sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+      
+      const vencidos = validades.filter(v => {
+        const data = new Date(v.data_validade);
+        return data < hoje;
+      });
+      
+      html = '';
+      vencidos.forEach(v => {
+        html += `
+          <div class="item" style="border-left: 3px solid #ef4444;">
+            <div class="item-info">
+              <div class="item-name">${v.produtos.nome}</div>
+              <div class="item-detail">🔴 Vencido em ${formatarData(v.data_validade)}</div>
+            </div>
+          </div>
+        `;
+      });
+      vencendo.forEach(v => {
+        const { dias } = verificarValidadeStatus(v.data_validade);
+        html += `
+          <div class="item" style="border-left: 3px solid #f59e0b;">
+            <div class="item-info">
+              <div class="item-name">${v.produtos.nome}</div>
+              <div class="item-detail">⏰ ${dias} dia(s) - ${formatarData(v.data_validade)}</div>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('proximosVencimentos').innerHTML = html || '<p style="color: #999; text-align: center; padding: 20px;">Nenhum vencimento próximo</p>';
+    }
+    
+    // PRODUTOS
+    async function adicionarProdutoUI() {
+      const nome = document.getElementById('nomeProduto').value.trim();
+      const marca = document.getElementById('marcaProduto').value.trim();
+      const categoria = document.getElementById('categoriaProduto').value.trim();
+      
+      if (!nome || !marca) {
+        mostrarNotificacao('Preencha nome e marca', 'error');
+        return;
+      }
+      
+      try {
+        await adicionarProduto(nome, marca, categoria || null);
+        mostrarNotificacao('Produto adicionado!', 'success');
+        document.getElementById('nomeProduto').value = '';
+        document.getElementById('marcaProduto').value = '';
+        document.getElementById('categoriaProduto').value = '';
+        await atualizarListaProdutos();
+      } catch (error) {
+        mostrarNotificacao('Erro ao adicionar', 'error');
+      }
+    }
+    
+    async function atualizarListaProdutos() {
+      const produtos = await listarProdutos();
+      let html = '';
+      produtos.forEach(p => {
+        html += `
+          <div class="item">
+            <div class="item-info">
+              <div class="item-name">${p.nome}</div>
+              <div class="item-detail">${p.marca}${p.categoria ? ' • ' + p.categoria : ''}</div>
+            </div>
+            <button onclick="deletarProdutoUI(${p.id})" class="btn btn-danger btn-small">Deletar</button>
+          </div>
+        `;
+      });
+      document.getElementById('listaProdutos').innerHTML = html || '<p style="color: #999; text-align: center; padding: 20px;">Nenhum produto</p>';
+    }
+    
+    async function deletarProdutoUI(id) {
+      if (confirm('Deletar este produto?')) {
+        await deletarProduto(id);
+        mostrarNotificacao('Produto deletado', 'success');
+        await atualizarListaProdutos();
+      }
+    }
+    
+    // ESTOQUES
+    async function atualizarEstoques() {
+      const lojaList = await listarEstoqueLojaCompleto();
+      let html = '';
+      lojaList.forEach(e => {
+        const classe = e.quantidade === 0 ? 'badge-danger' : e.quantidade < 5 ? 'badge-warning' : 'badge-success';
+        html += `
+          <div class="item">
+            <div class="item-info">
+              <div class="item-name">${e.produtos.nome}</div>
+              <div class="item-detail">${e.produtos.marca}</div>
+            </div>
+            <div class="item-action">
+              <span class="badge ${classe}">${e.quantidade} un</span>
+              <button onclick="aumentarEstoqueLojaUI(${e.produto_id})" class="btn btn-secondary btn-small">+</button>
+              <button onclick="diminuirEstoqueLojaUI(${e.produto_id})" class="btn btn-secondary btn-small">-</button>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('estoqueLojaUI').innerHTML = html || '<p style="color: #999;">Nenhum</p>';
+      
+      const deposList = await listarEstoqueDepositoCompleto();
+      html = '';
+      deposList.forEach(e => {
+        html += `
+          <div class="item">
+            <div class="item-info">
+              <div class="item-name">${e.produtos.nome}</div>
+              <div class="item-detail">${e.produtos.marca}</div>
+            </div>
+            <div class="item-action">
+              <span class="badge badge-success">${e.quantidade} un</span>
+              <button onclick="aumentarEstoqueDepositoUI(${e.produto_id})" class="btn btn-secondary btn-small">+</button>
+              <button onclick="diminuirEstoqueDepositoUI(${e.produto_id})" class="btn btn-secondary btn-small">-</button>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('estoqueDepositoUI').innerHTML = html || '<p style="color: #999;">Nenhum</p>';
+    }
+    
+    async function aumentarEstoqueLojaUI(id) {
+      const e = await obterEstoqueLojaDB(id);
+      await atualizarEstoqueLojaDB(id, e.quantidade + 1);
+      await atualizarEstoques();
+    }
+    
+    async function diminuirEstoqueLojaUI(id) {
+      const e = await obterEstoqueLojaDB(id);
+      if (e.quantidade > 0) {
+        await atualizarEstoqueLojaDB(id, e.quantidade - 1);
+        await atualizarEstoques();
+      }
+    }
+    
+    async function aumentarEstoqueDepositoUI(id) {
+      const e = await obterEstoqueDepositoDB(id);
+      await atualizarEstoqueDepositoDB(id, e.quantidade + 1);
+      await atualizarEstoques();
+    }
+    
+    async function diminuirEstoqueDepositoUI(id) {
+      const e = await obterEstoqueDepositoDB(id);
+      if (e.quantidade > 0) {
+        await atualizarEstoqueDepositoDB(id, e.quantidade - 1);
+        await atualizarEstoques();
+      }
+    }
+    
+    // VALIDADES
+    async function preencherSelectProdutosValidades() {
+      const produtos = await listarProdutos();
+      let html = '<option value="">Selecione...</option>';
+      produtos.forEach(p => {
+        html += `<option value="${p.id}">${p.nome}</option>`;
+      });
+      document.getElementById('produtoValidadeSelect').innerHTML = html;
+    }
+    
+    async function adicionarValidadeUI() {
+      const id = parseInt(document.getElementById('produtoValidadeSelect').value);
+      const data = document.getElementById('dataValidadeInput').value;
+      const qtd = parseInt(document.getElementById('qtdValidadeInput').value) || 1;
+      
+      if (!id || !data) {
+        mostrarNotificacao('Preencha todos', 'error');
+        return;
+      }
+      
+      try {
+        await adicionarValidade(id, data, qtd);
+        mostrarNotificacao('Validade registrada!', 'success');
+        document.getElementById('produtoValidadeSelect').value = '';
+        document.getElementById('dataValidadeInput').value = '';
+        document.getElementById('qtdValidadeInput').value = '';
+        await atualizarListaValidades();
+      } catch (error) {
+        mostrarNotificacao('Erro', 'error');
+      }
+    }
+    
+    async function atualizarListaValidades() {
+      const validades = await listarValidadesDB();
+      let html = '';
+      validades.forEach(v => {
+        const { status, cor, dias } = verificarValidadeStatus(v.data_validade);
+        const cores = { red: '#ef4444', yellow: '#f59e0b', green: '#10b981' };
+        html += `
+          <div class="item" style="border-left: 3px solid ${cores[cor]};">
+            <div class="item-info">
+              <div class="item-name">${v.produtos.nome}</div>
+              <div class="item-detail">${formatarData(v.data_validade)} • ${v.quantidade} un • ${dias} dia(s)</div>
+            </div>
+            <div class="item-action">
+              <span class="badge ${cor === 'red' ? 'badge-danger' : cor === 'yellow' ? 'badge-warning' : 'badge-success'}">
+                ${status === 'vencido' ? '❌' : status === 'vencendo' ? '⚠️' : '✓'}
+              </span>
+              <button onclick="deletarValidadeUI(${v.id})" class="btn btn-danger btn-small">Deletar</button>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('listaValidades').innerHTML = html || '<p style="color: #999;">Nenhuma</p>';
+    }
+    
+    async function deletarValidadeUI(id) {
+      if (confirm('Deletar?')) {
+        await deletarValidade(id);
+        mostrarNotificacao('Deletado', 'success');
+        await atualizarListaValidades();
+      }
+    }
+    
+    // CONTRATOS
+    async function adicionarContratoUI() {
+      const nome = document.getElementById('nomeContrato').value.trim();
+      const pct = parseFloat(document.getElementById('percentualContratado').value);
+      const tipo = document.getElementById('tipoContrato').value;
+      
+      if (!nome || !pct || !tipo) {
+        mostrarNotificacao('Preencha tudo', 'error');
+        return;
+      }
+      
+      try {
+        await adicionarContrato(nome, pct, 0, tipo, 'ativo');
+        mostrarNotificacao('Contrato criado!', 'success');
+        document.getElementById('nomeContrato').value = '';
+        document.getElementById('percentualContratado').value = '';
+        document.getElementById('tipoContrato').value = '';
+        await atualizarListaContratos();
+      } catch (error) {
+        mostrarNotificacao('Erro', 'error');
+      }
+    }
+    
+    async function atualizarListaContratos() {
+      const contratos = await listarContratos();
+      let html = '';
+      contratos.forEach(c => {
+        const pct = Math.round((c.percentual_atual / c.percentual_contratado) * 100);
+        html += `
+          <div class="item">
+            <div class="item-info">
+              <div class="item-name">${c.nome}</div>
+              <div class="item-detail">${c.tipo} • Contratado: ${c.percentual_contratado}% | Atual: ${c.percentual_atual.toFixed(1)}%</div>
+              <div class="progress" style="margin-top: 8px;">
+                <div class="progress-bar" style="width: ${Math.min(pct, 100)}%"></div>
+              </div>
+            </div>
+            <div class="item-action">
+              <span class="badge ${pct >= 100 ? 'badge-success' : 'badge-warning'}">${pct}%</span>
+              <button onclick="deletarContratoUI(${c.id})" class="btn btn-danger btn-small">Deletar</button>
+            </div>
+          </div>
+        `;
+      });
+      document.getElementById('listaContratos').innerHTML = html || '<p style="color: #999;">Nenhum</p>';
+    }
+    
+    async function deletarContratoUI(id) {
+      if (confirm('Deletar contrato?')) {
+        await deletarContrato(id);
+        mostrarNotificacao('Deletado', 'success');
+        await atualizarListaContratos();
+      }
+    }
+    
+    // CALCULADORA
+    function calcularFormula() {
+      const qtd = parseFloat(document.getElementById('calcQuantidade').value);
+      const pct = parseFloat(document.getElementById('calcPercentual').value);
+      
+      if (isNaN(qtd) || isNaN(pct)) {
+        mostrarNotificacao('Digite valores', 'error');
+        return;
+      }
+      
+      const resultado = calcularContrato(qtd, pct);
+      document.getElementById('resultadoCalc').textContent = resultado.toFixed(2);
+    }
+    
+    // NOTIFICAÇÃO
+    function mostrarNotificacao(msg, tipo = 'success') {
+      const n = document.createElement('div');
+      n.className = `notification ${tipo}`;
+      n.textContent = msg;
+      document.body.appendChild(n);
+      setTimeout(() => n.remove(), 3000);
+    }
+    
+    // INIT
+    document.addEventListener('DOMContentLoaded', async () => {
+      const ok = await testarConexaoSupabase();
+      if (ok) {
+        await atualizarDashboard();
+      }
+    });
+  </script>
+</body>
+</html>
