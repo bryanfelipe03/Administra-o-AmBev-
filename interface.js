@@ -129,6 +129,8 @@ async function adicionarProdutoUI() {
   const nome = document.getElementById('nomeProduto').value.trim();
   const marca = document.getElementById('marcaProduto').value.trim();
   const categoria = document.getElementById('categoriaProduto').value.trim();
+  const qtdLoja = parseInt(document.getElementById('qtdLojaInicial').value) || 0;
+  const qtdDeposito = parseInt(document.getElementById('qtdDepositoInicial').value) || 0;
   
   if (!nome || !marca) {
     mostrarNotificacao('✗ Preencha nome e marca do produto', 'error');
@@ -136,11 +138,16 @@ async function adicionarProdutoUI() {
   }
   
   try {
-    await adicionarProduto(nome, marca, categoria || null);
+    const produto = await adicionarProduto(nome, marca, categoria || null);
+    // Salvar quantidades iniciais no estoque
+    if (qtdLoja > 0) await atualizarEstoqueLojaDB(produto.id, qtdLoja);
+    if (qtdDeposito > 0) await atualizarEstoqueDepositoDB(produto.id, qtdDeposito);
     mostrarNotificacao('✓ Produto adicionado com sucesso!', 'success');
     document.getElementById('nomeProduto').value = '';
     document.getElementById('marcaProduto').value = '';
     document.getElementById('categoriaProduto').value = '';
+    document.getElementById('qtdLojaInicial').value = '0';
+    document.getElementById('qtdDepositoInicial').value = '0';
     await atualizarListaProdutos();
   } catch (error) {
     mostrarNotificacao('✗ Erro ao adicionar produto', 'error');
@@ -365,11 +372,13 @@ async function adicionarContratoUI() {
   }
   
   try {
-    await adicionarContrato(nome, percentual, 0, tipo, 'ativo');
+    const percAtual = parseFloat(document.getElementById('percentualAtualNovo').value) || 0;
+    await adicionarContrato(nome, percentual, percAtual, tipo, 'ativo');
     mostrarNotificacao('✓ Contrato adicionado!', 'success');
     document.getElementById('nomeContrato').value = '';
     document.getElementById('percentualContratado').value = '';
     document.getElementById('tipoContrato').value = '';
+    document.getElementById('percentualAtualNovo').value = '0';
     await atualizarListaContratos();
   } catch (error) {
     mostrarNotificacao('✗ Erro ao adicionar contrato', 'error');
@@ -393,18 +402,23 @@ async function atualizarListaContratos() {
               <strong style="font-size: 16px;">${c.nome}</strong>
               <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${c.tipo}</div>
             </div>
-            <span style="background: ${corBg}; color: ${corText}; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 14px;">${percentual}%</span>
+            <span style="background: ${corBg}; color: ${corText}; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 14px;">${percentual}% da meta</span>
           </div>
-          <div style="background: white; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 10px;">
-            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: ${Math.min(percentual, 100)}%;"></div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6b7280; margin-bottom: 4px;">
+            <span>🎯 Meta: ${c.percentual_contratado}%</span>
+            <span>📊 Realizado: ${c.percentual_atual.toFixed(1)}%</span>
           </div>
-          <div style="font-size: 12px; color: #6b7280; margin-bottom: 10px;">
-            Contratado: ${c.percentual_contratado}% | Atual: ${c.percentual_atual.toFixed(1)}%
+          <div style="background: white; border-radius: 6px; height: 10px; overflow: hidden; margin-bottom: 12px; border: 1px solid #e5e7eb;">
+            <div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: ${Math.min(percentual, 100)}%; transition: width 0.3s;"></div>
           </div>
-          <input type="number" id="input-${c.id}" placeholder="Novo percentual" value="${c.percentual_atual}" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; font-size: 12px;">
+          <div id="edit-area-${c.id}" style="display:none; margin-bottom: 8px;">
+            <label style="font-size: 11px; color: #6b7280; display:block; margin-bottom: 4px;">Novo % Realizado</label>
+            <input type="number" id="input-${c.id}" placeholder="Ex: 42.5" value="${c.percentual_atual}" step="0.1" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #667eea; border-radius: 6px; margin-bottom: 8px; font-size: 13px; box-sizing: border-box;">
+            <button onclick="salvarEdicaoContrato(${c.id})" style="width:100%; background:#667eea; color:white; border:none; padding:9px; border-radius:6px; font-weight:600; cursor:pointer; font-size:13px;">💾 Salvar</button>
+          </div>
           <div style="display: flex; gap: 8px;">
-            <button onclick="atualizarContratoUI(${c.id})" class="btn-primary" style="flex: 1; padding: 8px; font-size: 12px;">Atualizar</button>
-            <button onclick="deletarContratoUI(${c.id})" class="btn-secondary" style="flex: 1; padding: 8px; font-size: 12px;">Deletar</button>
+            <button onclick="toggleEditarContrato(${c.id})" style="flex:1; background:#f3f4f6; color:#374151; border:1px solid #d1d5db; padding:9px; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px;">✏️ Editar</button>
+            <button onclick="deletarContratoUI(${c.id})" style="flex:1; background:#fee2e2; color:#991b1b; border:none; padding:9px; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px;">🗑️ Deletar</button>
           </div>
         </div>
       `;
@@ -416,14 +430,17 @@ async function atualizarListaContratos() {
   }
 }
 
-async function atualizarContratoUI(id) {
+function toggleEditarContrato(id) {
+  const area = document.getElementById(`edit-area-${id}`);
+  if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+
+async function salvarEdicaoContrato(id) {
   const novoPercentual = parseFloat(document.getElementById(`input-${id}`).value);
-  
   if (isNaN(novoPercentual)) {
     mostrarNotificacao('✗ Digite um valor válido', 'error');
     return;
   }
-  
   try {
     await atualizarContrato(id, novoPercentual, 'ativo');
     mostrarNotificacao('✓ Contrato atualizado!', 'success');
@@ -431,6 +448,10 @@ async function atualizarContratoUI(id) {
   } catch (error) {
     mostrarNotificacao('✗ Erro ao atualizar', 'error');
   }
+}
+
+async function atualizarContratoUI(id) {
+  await salvarEdicaoContrato(id);
 }
 
 async function deletarContratoUI(id) {
