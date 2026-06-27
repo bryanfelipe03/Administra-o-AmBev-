@@ -1,6 +1,6 @@
 // Configuração do Supabase
-const SUPABASE_URL = 'https://exngmtewnurlioyqdkec.supabase.co'; // SUBSTITUIR
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4bmdtdGV3bnVybGlveXFka2VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDgyNjIsImV4cCI6MjA5ODA4NDI2Mn0.KLo7bcXk7LjVbamnIuQXXZiMbuyxOoJ5DWbHJdAeNAs'; // SUBSTITUIR
+const SUPABASE_URL = 'https://sptmwpiwfhefqchctlag.supabase.co'; // SUBSTITUIR
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwdG13cGl3ZmhlZnFjaGN0bGFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDkzMzcsImV4cCI6MjA5ODA4NTMzN30.AWacnxvG6rSBX6ZmfxUWDo4zGwPTvrk3Er3ReBMzDHs'; // SUBSTITUIR
 
 // Inicializar cliente Supabase
 const { createClient } = window.supabase;
