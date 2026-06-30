@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AmBev Control</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --border: #e2e4e9;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --warning-bg: #fffbeb;
+      --warning-text: #92400e;
+      --success-bg: #f0fdf4;
+      --success-text: #166534;
+      --radius: 10px;
+      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
+      --nav-h: 56px;
+      --header-h: 60px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── HEADER ── */
+    .header {
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px;
+      position: sticky; top: 0; z-index: 200;
+      box-shadow: 0 1px 0 var(--border);
+    }
+    .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+    .logo span { color: var(--accent); }
+    .logo-sub { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-top: 1px; }
+    .header-actions { display: flex; gap: 8px; }
+
+    /* ── SIDEBAR (desktop) / BOTTOM NAV (mobile) ── */
+    .layout { display: flex; min-height: calc(100vh - var(--header-h)); }
+
+    .sidebar {
+      width: 220px; min-width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      position: sticky; top: var(--header-h);
+      height: calc(100vh - var(--header-h));
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: none; background: none;
+      font-size: 14px; font-weight: 500; color: var(--text-muted);
+      cursor: pointer; transition: all .15s; text-align: left; width: 100%;
+    }
+    .sidebar-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-item:hover { background: var(--bg); color: var(--text); }
+    .sidebar-item.active { background: #eff6ff; color: var(--accent); font-weight: 600; }
+
+    .main { flex: 1; padding: 28px 24px; max-width: 1100px; }
+
+    /* ── BOTTOM NAV (mobile only) ── */
+    .bottom-nav {
+      display: none;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      z-index: 200;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .bottom-nav-inner { display: flex; min-width: max-content; }
+    .bnav-item {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 8px 14px;
+      border: none; background: none;
+      font-size: 10px; font-weight: 500; color: var(--text-muted);
+      cursor: pointer; white-space: nowrap;
+    }
+    .bnav-item .icon { font-size: 18px; }
+    .bnav-item.active { color: var(--accent); }
+
+    /* ── PAGE ── */
+    .page { display: none; }
+    .page.active { display: block; animation: fadeIn .2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .page-title {
+      font-size: 22px; font-weight: 700; margin-bottom: 20px; color: var(--text);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .page-title .icon { font-size: 20px; }
+
+    /* ── CARDS / SURFACES ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+    .card-title {
+      font-size: 14px; font-weight: 700; color: var(--text);
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+
+    /* ── STAT GRID ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px; margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .stat-val { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1; margin-bottom: 4px; }
+    .stat-lbl { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .stat-card.danger .stat-val { color: var(--danger); }
+    .stat-card.warning .stat-val { color: #d97706; }
+    .stat-card.ok .stat-val { color: #16a34a; }
+    .stat-card.accent .stat-val { color: var(--accent); }
+
+    /* ── TWO COL ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── FORM ── */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    input, select, textarea {
+      width: 100%; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 14px; font-family: inherit; color: var(--text);
+      background: var(--surface); transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 18px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all .15s; font-family: inherit;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,.25); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--bg); border-color: #aaa; }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-ghost { background: none; color: var(--text-muted); padding: 6px 10px; }
+    .btn-ghost:hover { color: var(--text); background: var(--bg); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-block { width: 100%; justify-content: center; }
+    .btn-wa { background: #25d366; color: white; }
+    .btn-wa:hover { background: #1ebe5d; }
+
+    /* ── LIST ITEMS ── */
+    .item-list { display: flex; flex-direction: column; gap: 8px; }
+    .item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; transition: border-color .15s;
+    }
+    .item:hover { border-color: #aaa; }
+    .item-body { flex: 1; min-width: 0; }
+    .item-name { font-weight: 600; font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .item-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .badge-ok { background: var(--success-bg); color: var(--success-text); }
+    .badge-warn { background: var(--warning-bg); color: var(--warning-text); }
+    .badge-bad { background: var(--danger-bg); color: var(--danger); }
+    .badge-blue { background: #eff6ff; color: var(--accent); }
+
+    /* ── PROGRESS ── */
+    .progress-wrap { margin: 6px 0 2px; }
+    .progress-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .progress-bar-bg { height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s ease; }
+    .progress-bar-fill.full { background: #16a34a; }
+
+    /* ── CONTRACT CARD ── */
+    .contract-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px; margin-bottom: 8px;
+    }
+    .contract-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .contract-title { font-weight: 700; font-size: 15px; }
+    .contract-tipo { font-size: 11px; color: var(--text-muted); margin-top: 2px; text-transform: capitalize; }
+    .contract-edit-area { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: none; }
+
+    /* ── STOCK CARD ── */
+    .stock-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 8px;
+    }
+    .stock-body { flex: 1; }
+    .stock-name { font-weight: 600; font-size: 14px; }
+    .stock-brand { font-size: 11px; color: var(--text-muted); }
+    .stock-controls { display: flex; align-items: center; gap: 8px; }
+    .qty-btn {
+      width: 30px; height: 30px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface);
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .qty-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+    .qty-display {
+      min-width: 44px; text-align: center;
+      font-size: 15px; font-weight: 700;
+    }
+
+    /* ── VALIDITY CARD ── */
+    .val-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-left-width: 3px; margin-bottom: 8px;
+    }
+    .val-card.red { border-left-color: var(--danger); background: #fff8f8; }
+    .val-card.yellow { border-left-color: #f59e0b; background: #fffdf5; }
+    .val-card.green { border-left-color: #16a34a; }
+
+    /* ── NOTIFICATION ── */
+    .notif {
+      position: fixed; top: 16px; right: 16px;
+      padding: 12px 18px; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 9999; animation: slideIn .25s ease;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .notif.success { background: var(--success-bg); color: var(--success-text); border: 1px solid #bbf7d0; }
+    .notif.error { background: var(--danger-bg); color: var(--danger); border: 1px solid #fecaca; }
+    .notif.info { background: #eff6ff; color: var(--accent); border: 1px solid #bfdbfe; }
+    @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── LOADING ── */
+    .loading { color: var(--text-muted); text-align: center; padding: 24px; font-size: 13px; }
+    .empty { color: var(--text-muted); text-align: center; padding: 24px; font-size: 13px; }
+
+    /* ── SEPARATOR ── */
+    .section-sep { height: 1px; background: var(--border); margin: 16px 0; }
+
+    /* ── DASHBOARD PANELS ── */
+    .dash-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── CALC ── */
+    .calc-result {
+      background: #1e293b; color: white;
+      border-radius: 10px; padding: 24px;
+      text-align: center; margin-top: 16px;
+    }
+    .calc-result .val { font-size: 48px; font-weight: 800; }
+    .calc-result .lbl { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .bottom-nav { display: block; }
+      .main { padding: 16px 14px 80px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col, .dash-panels { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .header { padding: 0 16px; }
+      .page-title { font-size: 18px; }
+      .stat-val { font-size: 22px; }
+      .notif { left: 12px; right: 12px; }
+    }
+    @media (max-width: 480px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(17,24,39,0.55);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: var(--surface); border-radius: 14px; width: 100%; max-width: 520px;
+      max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: fadeIn .18s ease;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 16px; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 20px; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+    .modal-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+    .modal-hint code { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+    textarea#bulkValidadeInput { min-height: 140px; resize: vertical; font-family: ui-monospace, monospace; font-size: 13px; line-height: 1.5; }
+    .preview-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; margin-bottom: 6px; }
+    .preview-item.ok { background: var(--success-bg); color: var(--success-text); }
+    .preview-item.fail { background: var(--danger-bg); color: var(--danger); }
+
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="logo">Am<span>Bev</span></div>
+    <div class="logo-sub">Control</div>
+  </div>
+  <div class="header-actions">
+    <button onclick="copiarMensagemWhatsApp()" class="btn btn-wa btn-sm">💬 WhatsApp</button>
+    <button onclick="gerarRelatorioPDF()" class="btn btn-secondary btn-sm">📄 PDF</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR (desktop) -->
+  <nav class="sidebar">
+    <button class="sidebar-item active" data-page="dashboard" onclick="ativarPagina('dashboard')">
+      <span class="icon">📊</span> Dashboard
+    </button>
+    <button class="sidebar-item" data-page="produtos" onclick="ativarPagina('produtos')">
+      <span class="icon">📦</span> Produtos
+    </button>
+    <button class="sidebar-item" data-page="estoque" onclick="ativarPagina('estoque')">
+      <span class="icon">📈</span> Estoques
+    </button>
+    <button class="sidebar-item" data-page="validades" onclick="ativarPagina('validades')">
+      <span class="icon">⏰</span> Validades
+    </button>
+    <button class="sidebar-item" data-page="contratos" onclick="ativarPagina('contratos')">
+      <span class="icon">📋</span> Contratos
+    </button>
+    <button class="sidebar-item" data-page="calculadora" onclick="ativarPagina('calculadora')">
+      <span class="icon">🧮</span> Calculadora
+    </button>
+    <button class="sidebar-item" data-page="relatorios" onclick="ativarPagina('relatorios')">
+      <span class="icon">📄</span> Relatórios
+    </button>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="page active">
+      <div class="page-title"><span class="icon">📊</span> Dashboard</div>
+
+      <div class="stat-grid">
+        <div class="stat-card accent">
+          <div class="stat-val" id="totalProdutos">—</div>
+          <div class="stat-lbl">📦 Produtos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="estoqueLojaQtd">—</div>
+          <div class="stat-lbl">🏪 Loja</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="estoqueDepositoQtd">—</div>
+          <div class="stat-lbl">🏢 Depósito</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="stat-val" id="produtosVencendo">—</div>
+          <div class="stat-lbl">⚠️ Vencendo</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-val" id="produtosVencidos">—</div>
+          <div class="stat-lbl">❌ Vencidos</div>
+        </div>
+        <div class="stat-card ok">
+          <div class="stat-val" id="percentualCumprimento">—</div>
+          <div class="stat-lbl">✅ Contratos</div>
+        </div>
+      </div>
+
+      <div class="dash-panels">
+        <div class="card">
+          <div class="card-title">📋 Contratos Ativos</div>
+          <div id="contratosList" class="loading">Carregando…</div>
+        </div>
+        <div class="card">
+          <div class="card-title">⏳ Próximos Vencimentos</div>
+          <div id="proximosVencimentos" class="loading">Carregando…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div id="produtos" class="page">
+      <div class="page-title"><span class="icon">📦</span> Produtos</div>
+
+      <div class="card">
+        <div class="card-title">Adicionar Produto</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Nome *</label>
+            <input type="text" id="nomeProduto" placeholder="Ex: Skol Lata 350ml">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Marca *</label>
+            <input type="text" id="marcaProduto" placeholder="Ex: Skol">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoria</label>
+            <input type="text" id="categoriaProduto" placeholder="Ex: Cerveja">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unidades por Fardo</label>
+            <input type="number" id="unidadesPorFardoProduto" min="1" value="1" placeholder="Ex: 24">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Qtd Loja</label>
+            <input type="number" id="qtdLojaInicial" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Qtd Depósito</label>
+            <input type="number" id="qtdDepositoInicial" min="0" value="0">
+          </div>
+        </div>
+        <button onclick="adicionarProdutoUI()" class="btn btn-primary">＋ Adicionar Produto</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span>Lista de Produtos</span>
+          <button onclick="copiarListaProdutos()" class="btn btn-secondary btn-sm" style="text-transform:none;letter-spacing:0;font-weight:600">📋 Copiar Lista p/ Validades</button>
+        </div>
+        <div id="listaProdutos" class="loading">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- ESTOQUES -->
+    <div id="estoque" class="page">
+      <div class="page-title"><span class="icon">📈</span> Estoques</div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span>🏪 Estoque da Loja</span>
+            <button onclick="abrirModalBulkEstoque('loja')" class="btn btn-ghost btn-sm" title="Atualizar quantidades em massa" style="text-transform:none;letter-spacing:0;font-size:18px;padding:4px 10px">✏️</button>
+          </div>
+          <div id="estoqueLojaUI" class="loading">Carregando…</div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span>🏢 Estoque do Depósito</span>
+            <button onclick="abrirModalBulkEstoque('deposito')" class="btn btn-ghost btn-sm" title="Atualizar quantidades em massa" style="text-transform:none;letter-spacing:0;font-size:18px;padding:4px 10px">✏️</button>
+          </div>
+          <div id="estoqueDepositoUI" class="loading">Carregando…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VALIDADES -->
+    <div id="validades" class="page">
+      <div class="page-title"><span class="icon">⏰</span> Validades</div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span>Registrar Validade</span>
+          <button onclick="abrirModalBulkValidade()" class="btn btn-ghost btn-sm" title="Adicionar várias validades de uma vez" style="text-transform:none;letter-spacing:0;font-size:18px;padding:4px 10px">✏️</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Produto *</label>
+            <select id="produtoValidadeSelect"><option value="">Selecione…</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Validade *</label>
+            <input type="date" id="dataValidadeInput">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantidade</label>
+            <input type="number" id="qtdValidadeInput" min="1" value="1">
+          </div>
+        </div>
+        <button onclick="adicionarValidadeUI()" class="btn btn-primary">＋ Registrar</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span>Produtos por Validade</span>
+          <button onclick="deletarTodasValidadesUI()" class="btn btn-danger btn-sm" title="Excluir todas as validades cadastradas">🗑️ Limpar tudo</button>
+        </div>
+        <div id="listaValidades" class="loading">Carregando…</div>
+      </div>
+    </div>
+<!-- CONTRATOS -->
+    <div id="contratos" class="page">
+      <div class="page-title"><span class="icon">📋</span> Contratos</div>
+
+      <div class="card">
+        <div class="card-title">Novo Contrato</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Nome *</label>
+            <input type="text" id="nomeContrato" placeholder="Ex: Geladeira A">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo *</label>
+            <select id="tipoContrato">
+              <option value="">Selecione…</option>
+              <option value="frente">Frente</option>
+              <option value="prateleira">Prateleira</option>
+              <option value="modulo">Módulo</option>
+              <option value="ponto_extra">Ponto Extra</option>
+              <option value="geladeira">Geladeira</option>
+              <option value="ilha">Ilha Promocional</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">% Meta (contratado) *</label>
+            <input type="number" id="percentualContratado" placeholder="Ex: 55" step="0.1" min="0" max="100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">% Realizado atual</label>
+            <input type="number" id="percentualAtualNovo" placeholder="Ex: 30" step="0.1" min="0" max="100" value="0">
+          </div>
+        </div>
+        <button onclick="adicionarContratoUI()" class="btn btn-primary">＋ Adicionar Contrato</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Contratos Cadastrados</div>
+        <div id="listaContratos" class="loading">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- CALCULADORA -->
+    <div id="calculadora" class="page">
+      <div class="page-title"><span class="icon">🧮</span> Calculadora</div>
+      <div class="card" style="max-width:480px">
+        <div class="card-title">Calcular Contrato</div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Quantidade total</label>
+          <input type="number" id="calcQuantidade" placeholder="Ex: 120">
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label class="form-label">Percentual (%)</label>
+          <input type="number" id="calcPercentual" placeholder="Ex: 55" step="0.1">
+        </div>
+        <button onclick="calcularFormula()" class="btn btn-primary btn-block">Calcular</button>
+        <div class="calc-result">
+          <div class="lbl">Resultado</div>
+          <div class="val" id="resultadoCalc">0</div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px">Fórmula: (Qtd × %) ÷ 100</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELATÓRIOS -->
+    <div id="relatorios" class="page">
+      <div class="page-title"><span class="icon">📄</span> Relatórios</div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">📄 Relatório PDF</div>
+          <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Gera um PDF completo com estoque, contratos e validades.</p>
+          <button onclick="gerarRelatorioPDF()" class="btn btn-primary btn-block">⬇ Gerar PDF</button>
+        </div>
+        <div class="card">
+          <div class="card-title">💬 Mensagem WhatsApp</div>
+          <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">Copia um resumo formatado pronto para enviar no WhatsApp.</p>
+          <button onclick="copiarMensagemWhatsApp()" class="btn btn-wa btn-block">📋 Copiar Mensagem</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- BOTTOM NAV (mobile) -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <button class="bnav-item active" data-page="dashboard" onclick="ativarPagina('dashboard')"><span class="icon">📊</span>Dashboard</button>
+    <button class="bnav-item" data-page="produtos" onclick="ativarPagina('produtos')"><span class="icon">📦</span>Produtos</button>
+    <button class="bnav-item" data-page="estoque" onclick="ativarPagina('estoque')"><span class="icon">📈</span>Estoque</button>
+    <button class="bnav-item" data-page="validades" onclick="ativarPagina('validades')"><span class="icon">⏰</span>Validades</button>
+    <button class="bnav-item" data-page="contratos" onclick="ativarPagina('contratos')"><span class="icon">📋</span>Contratos</button>
+    <button class="bnav-item" data-page="calculadora" onclick="ativarPagina('calculadora')"><span class="icon">🧮</span>Calc</button>
+    <button class="bnav-item" data-page="relatorios" onclick="ativarPagina('relatorios')"><span class="icon">📄</span>Relatórios</button>
+  </div>
+</nav>
+
+<!-- MODAL BULK VALIDADES -->
+<div class="modal-overlay" id="modalBulkValidade">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>✏️ Adicionar Validades em Massa</h3>
+      <button class="modal-close" onclick="fecharModalBulkValidade()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-hint">
+        Uma linha por produto, no formato:<br>
+        <code>Produto - dd/mm/aaaa, dd/mm/aaaa</code><br>
+        Você pode colar várias datas separadas por vírgula para o mesmo produto.<br>
+        Pra indicar quantidade direto, use <code>dd/mm/aaaa x4</code> (4 unidades nessa validade).
+      </div>
+      <textarea id="bulkValidadeInput" placeholder="Skol - 12/04/2027, 31/03/2027&#10;Brahma - 12/02/2027 x7"></textarea>
+      <div id="bulkValidadePreview"></div>
+    </div>
+    <div class="modal-footer" id="bulkValidadeFooterAnalisar">
+      <button class="btn btn-secondary" onclick="fecharModalBulkValidade()">Cancelar</button>
+      <button class="btn btn-primary" onclick="analisarBulkValidade()">🔍 Analisar</button>
+    </div>
+    <div class="modal-footer" id="bulkValidadeFooterConfirmar" style="display:none">
+      <button class="btn btn-secondary" onclick="voltarBulkValidade()">← Voltar</button>
+      <button class="btn btn-primary" id="btnConfirmarBulkValidade" onclick="confirmarBulkValidade()">✓ Confirmar e Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL BULK ESTOQUE -->
+<div class="modal-overlay" id="modalBulkEstoque">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="bulkEstoqueTitulo">✏️ Atualizar Estoque em Massa</h3>
+      <button class="modal-close" onclick="fecharModalBulkEstoque()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-hint">
+        Uma linha por produto, no formato:<br>
+        <code>Produto - X fardos - Y unidades soltas</code><br>
+        Também aceita só <code>Produto - X fardos</code> ou <code>Produto - Y unidades</code>.<br>
+        O valor informado <strong>substitui</strong> a quantidade atual (não soma).
+      </div>
+      <textarea id="bulkEstoqueInput" placeholder="Brahma - 88 fardos - 13 unidades soltas&#10;Skol Lata 350ml - 20 unidades"></textarea>
+      <div id="bulkEstoquePreview"></div>
+    </div>
+    <div class="modal-footer" id="bulkEstoqueFooterAnalisar">
+      <button class="btn btn-secondary" onclick="fecharModalBulkEstoque()">Cancelar</button>
+      <button class="btn btn-primary" onclick="analisarBulkEstoque()">🔍 Analisar</button>
+    </div>
+    <div class="modal-footer" id="bulkEstoqueFooterConfirmar" style="display:none">
+      <button class="btn btn-secondary" onclick="voltarBulkEstoque()">← Voltar</button>
+      <button class="btn btn-primary" id="btnConfirmarBulkEstoque" onclick="confirmarBulkEstoque()">✓ Confirmar e Atualizar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR PRODUTO -->
+<div class="modal-overlay" id="modalEditarProduto">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>✏️ Editar Produto</h3>
+      <button class="modal-close" onclick="fecharModalEditarProduto()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editProdutoId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Nome *</label>
+          <input type="text" id="editProdutoNome">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Marca *</label>
+          <input type="text" id="editProdutoMarca">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categoria</label>
+          <input type="text" id="editProdutoCategoria">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidades por Fardo</label>
+          <input type="number" id="editProdutoUnidadesPorFardo" min="1">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalEditarProduto()">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarEditProduto" onclick="salvarEditProduto()">✓ Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR VALIDADE -->
+<div class="modal-overlay" id="modalEditarValidade">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>✏️ Editar Validade</h3>
+      <button class="modal-close" onclick="fecharModalEditarValidade()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editValidadeId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Produto *</label>
+          <select id="editValidadeProdutoSelect"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data de Validade *</label>
+          <input type="date" id="editValidadeData">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantidade</label>
+          <input type="number" id="editValidadeQtd" min="1">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalEditarValidade()">Cancelar</button>
+      <button class="btn btn-primary" id="btnSalvarEditValidade" onclick="salvarEditValidade()">✓ Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Configuração do Supabase
+const SUPABASE_URL = 'https://sptmwpiwfhefqchctlag.supabase.co'; // SUBSTITUIR
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwdG13cGl3ZmhlZnFjaGN0bGFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDkzMzcsImV4cCI6MjA5ODA4NTMzN30.AWacnxvG6rSBX6ZmfxUWDo4zGwPTvrk3Er3ReBMzDHs'; // SUBSTITUIR
+ //Inicializar cliente Supabase no escopo global (window) para evitar
+// "Identifier 'supabase' has already been declared" entre arquivos
+if (!window._supabaseClient) {
+  const { createClient } = window.supabase;
+  window._supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+// Alias global acessível por app.js, relatorios.js e interface.js
+var supabase = window._supabaseClient;
+
+// Função global para testar conexão (chamada pelo index.html)
+async function testarConexaoSupabase() {
+  try {
+    const { error } = await supabase
+      .from('produtos')
+      .select('*', { count: 'exact', head: true });
+    if (error) throw error;
+    console.log('✓ Conectado ao Supabase com sucesso');
+    return true;
+  } catch (err) {
+    console.error('✗ Erro ao conectar Supabase:', err.message);
+    return false;
+  }
+}
+
+
+// ========== PRODUTOS ==========
+async function adicionarProduto(nome, marca, categoria, unidadesPorFardo) {
+  const { data, error } = await supabase
+    .from('produtos')
+    .insert([{ nome, marca, categoria, unidades_por_fardo: unidadesPorFardo || 1 }])
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function listarProdutos() {
+  const { data, error } = await supabase
+    .from('produtos')
+    .select('*')
+    .order('nome');
+  
+  if (error) throw error;
+  return data;
+}
+
+async function deletarProduto(id) {
+  const { error } = await supabase
+    .from('produtos')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
+}
+
+async function atualizarProduto(id, nome, marca, categoria, unidadesPorFardo) {
+  const { data, error } = await supabase
+    .from('produtos')
+    .update({ nome, marca, categoria, unidades_por_fardo: unidadesPorFardo || 1 })
+    .eq('id', id)
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+// ========== ESTOQUE LOJA ==========
+async function atualizarEstoqueLojaDB(produtoId, quantidade) {
+  const { data, error } = await supabase
+    .from('estoque_loja')
+    .upsert({ produto_id: produtoId, quantidade }, { onConflict: 'produto_id' })
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function obterEstoqueLojaDB(produtoId) {
+  const { data, error } = await supabase
+    .from('estoque_loja')
+    .select('*')
+    .eq('produto_id', produtoId)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || { quantidade: 0 };
+}
+
+async function listarEstoqueLojaCompleto() {
+  const { data, error } = await supabase
+    .from('estoque_loja')
+    .select('*, produtos(nome, marca, categoria, unidades_por_fardo)')
+    .order('produto_id');
+  
+  if (error) throw error;
+  return data;
+}
+
+// ========== ESTOQUE DEPÓSITO ==========
+async function atualizarEstoqueDepositoDB(produtoId, quantidade) {
+  const { data, error } = await supabase
+    .from('estoque_deposito')
+    .upsert({ produto_id: produtoId, quantidade }, { onConflict: 'produto_id' })
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function obterEstoqueDepositoDB(produtoId) {
+  const { data, error } = await supabase
+    .from('estoque_deposito')
+    .select('*')
+    .eq('produto_id', produtoId)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || { quantidade: 0 };
+}
+
+async function listarEstoqueDepositoCompleto() {
+  const { data, error } = await supabase
+    .from('estoque_deposito')
+    .select('*, produtos(nome, marca, categoria, unidades_por_fardo)')
+    .order('produto_id');
+  
+  if (error) throw error;
+  return data;
+}
+
+// ========== VALIDADES ==========
+async function adicionarValidade(produtoId, dataValidade, quantidade) {
+  const { data, error } = await supabase
+    .from('validades')
+    .insert([{ produto_id: produtoId, data_validade: dataValidade, quantidade }])
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function listarValidadesDB() {
+  const { data, error } = await supabase
+    .from('validades')
+    .select('*, produtos(nome, marca, categoria)')
+    .order('data_validade');
+  
+  if (error) throw error;
+  return data;
+}
+
+async function deletarValidade(id) {
+  const { error } = await supabase
+    .from('validades')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
+}
+
+async function atualizarValidade(id, produtoId, dataValidade, quantidade) {
+  const { data, error } = await supabase
+    .from('validades')
+    .update({ produto_id: produtoId, data_validade: dataValidade, quantidade })
+    .eq('id', id)
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function deletarTodasValidades() {
+  const { error } = await supabase
+    .from('validades')
+    .delete()
+    .gte('id', 0);
+  
+  if (error) throw error;
+}
+
+// ========== CONTRATOS ==========
+async function adicionarContrato(nome, percentualContratado, percentualAtual, tipo, status) {
+  const { data, error } = await supabase
+    .from('contratos')
+    .insert([{ nome, percentual_contratado: percentualContratado, percentual_atual: percentualAtual, tipo, status }])
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function listarContratos() {
+  const { data, error } = await supabase
+    .from('contratos')
+    .select('*')
+    .order('nome');
+  
+  if (error) throw error;
+  return data;
+}
+
+async function atualizarContrato(id, percentualAtual, status) {
+  const { data, error } = await supabase
+    .from('contratos')
+    .update({ percentual_atual: percentualAtual, status })
+    .eq('id', id)
+    .select();
+  
+  if (error) throw error;
+  return data[0];
+}
+
+async function deletarContrato(id) {
+  const { error } = await supabase
+    .from('contratos')
+    .delete()
+    .eq('id', id);
+  
+  if (error) throw error;
+}
+
+// ========== DASHBOARD STATS ==========
+async function obterEstatisticas() {
+  try {
+    const produtos = await listarProdutos();
+    const estoqueLojaList = await listarEstoqueLojaCompleto();
+    const estoqueDepositoList = await listarEstoqueDepositoCompleto();
+    const validades = await listarValidadesDB();
+    const contratos = await listarContratos();
+    
+    const hoje = new Date();
+    const proximosDias = new Date();
+    proximosDias.setDate(proximosDias.getDate() + 7);
+    
+    const vencendo = validades.filter(v => {
+      const data = new Date(v.data_validade);
+      return data >= hoje && data <= proximosDias;
+    });
+    
+    const vencidos = validades.filter(v => {
+      const data = new Date(v.data_validade);
+      return data < hoje;
+    });
+    
+    const totalEstoqueLojaQtd = estoqueLojaList.reduce((sum, e) => sum + (e.quantidade || 0), 0);
+    const totalEstoqueDepositoQtd = estoqueDepositoList.reduce((sum, e) => sum + (e.quantidade || 0), 0);
+    
+    const contratosAtivos = contratos.filter(c => c.status === 'ativo');
+    const contratosCumpridos = contratosAtivos.filter(c => c.percentual_atual >= c.percentual_contratado);
+    
+    return {
+      totalProdutos: produtos.length,
+      estoqueLojaQtd: totalEstoqueLojaQtd,
+      estoqueDepositoQtd: totalEstoqueDepositoQtd,
+      produtosVencendo: vencendo.length,
+      produtosVencidos: vencidos.length,
+      contratosAtivos: contratosAtivos.length,
+      contratosCumpridos: contratosCumpridos.length,
+      percentualCumprimento: contratosAtivos.length > 0 ? Math.round((contratosCumpridos.length / contratosAtivos.length) * 100) : 0
+    };
+  } catch (error) {
+    console.error('Erro ao obter estatísticas:', error);
+    return null;
+  }
+}
+
+// ========== UTILIDADES ==========
+function calcularContrato(quantidade, percentual) {
+  return (quantidade * percentual) / 100;
+}
+
+// Converte uma quantidade total em { fardos, soltas } de acordo com o
+// tamanho do fardo do produto (unidades_por_fardo). Se não houver tamanho
+// definido (ou for <= 1), tudo é tratado como "unidades soltas".
+function calcularFardosSoltas(quantidade, unidadesPorFardo) {
+  const upf = parseInt(unidadesPorFardo) || 1;
+  if (upf <= 1) return { fardos: 0, soltas: quantidade };
+  const fardos = Math.floor(quantidade / upf);
+  const soltas = quantidade % upf;
+  return { fardos, soltas };
+}
+
+// Converte uma string de data no formato BR (dd/mm/aaaa ou dd/mm/aa) para
+// o formato ISO (aaaa-mm-dd) usado pelo Supabase. Retorna null se a data
+// for inválida (ex: dia 34, mês 13, 30/02, etc).
+function parseDataBR(str) {
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return null;
+  let [, dia, mes, ano] = m;
+  dia = parseInt(dia); mes = parseInt(mes); ano = parseInt(ano);
+  if (ano < 100) ano += 2000;
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+  const data = new Date(ano, mes - 1, dia);
+  // Confere se o JS não "estourou" o mês (ex: 31/04 viraria 1/05)
+  if (data.getFullYear() !== ano || data.getMonth() !== mes - 1 || data.getDate() !== dia) return null;
+  const pad = n => String(n).padStart(2, '0');
+  return `${ano}-${pad(mes)}-${pad(dia)}`;
+}
+
+function verificarValidadeStatus(dataValidade) {
+  const hoje = new Date();
+  const data = new Date(dataValidade);
+  const dias = Math.ceil((data - hoje) / (1000 * 60 * 60 * 24));
+  
+  if (dias < 0) return { status: 'vencido', cor: 'red', dias };
+  if (dias <= 7) return { status: 'vencendo', cor: 'yellow', dias };
+  return { status: 'ok', cor: 'green', dias };
+}
+
+function formatarData(dataString) {
+  const opcoes = { year: 'numeric', month: '2-digit', day: '2-digit' };
+  return new Date(dataString).toLocaleDateString('pt-BR', opcoes);
+}
+
+
+// ========== HELPERS DE AGRUPAMENTO ==========
+
+// Agrupa uma lista de estoque (loja ou depósito) por produto e devolve
+// também o total geral de fardos/soltas.
+function agruparEstoquePorProduto(lista) {
+  const itens = lista
+    .map(e => {
+      const upf = e.produtos?.unidades_por_fardo || 1;
+      const { fardos, soltas } = calcularFardosSoltas(e.quantidade || 0, upf);
+      return {
+        nome: e.produtos?.nome || 'Produto',
+        marca: e.produtos?.marca || '',
+        quantidade: e.quantidade || 0,
+        fardos, soltas,
+        temFardo: upf > 1
+      };
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+
+  const totalFardos = itens.reduce((s, i) => s + i.fardos, 0);
+  const totalSoltas = itens.reduce((s, i) => s + i.soltas, 0);
+
+  return { itens, totalFardos, totalSoltas };
+}
+
+// Agrupa validades por categoria do produto (ex: "Cerveja", "Refrigerante")
+function agruparValidadesPorCategoria(validades) {
+  const grupos = {};
+  validades.forEach(v => {
+    const cat = v.produtos?.categoria?.trim() || 'Outros';
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(v);
+  });
+  // ordena cada grupo por data e os grupos por nome
+  Object.values(grupos).forEach(arr => arr.sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade)));
+  return Object.keys(grupos).sort().map(cat => ({ categoria: cat, itens: grupos[cat] }));
+}
+
+// ========== GERAÇÃO DE RELATÓRIO PDF ==========
+async function gerarRelatorioPDF() {
+  const estoqueLojaList = await listarEstoqueLojaCompleto();
+  const estoqueDepositoList = await listarEstoqueDepositoCompleto();
+  const validades = await listarValidadesDB();
+  const contratos = await listarContratos();
+  const stats = await obterEstatisticas();
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const marginX = 16;
+  let y = 18;
+
+  const corPrimaria = [37, 99, 235];
+  const corMuted = [107, 114, 128];
+  const corVermelho = [220, 38, 38];
+  const corAmarelo = [217, 119, 6];
+  const corVerde = [22, 163, 74];
+
+  const checkPageBreak = (alturaNecessaria = 10) => {
+    if (y + alturaNecessaria > 285) { doc.addPage(); y = 18; }
+  };
+
+  const tituloSecao = (texto, emoji = '') => {
+    checkPageBreak(14);
+    doc.setFillColor(...corPrimaria);
+    doc.rect(marginX, y - 5, pageW - marginX * 2, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(11);
+    doc.text(`${emoji}  ${texto}`, marginX + 3, y);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+    y += 10;
+  };
+
+  // ── CABEÇALHO ──
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(...corPrimaria);
+  doc.text('RELATÓRIO AMBEV CONTROL', marginX, y);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(...corMuted);
+  doc.setFontSize(9);
+  y += 6;
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`, marginX, y);
+  doc.setTextColor(0, 0, 0);
+  y += 4;
+  doc.setDrawColor(...corPrimaria);
+  doc.setLineWidth(0.6);
+  doc.line(marginX, y, pageW - marginX, y);
+  y += 10;
+
+  // ── RESUMO EXECUTIVO ──
+  tituloSecao('RESUMO EXECUTIVO', '📊');
+  doc.setFontSize(10);
+  const resumoLinhas = [
+    [`Total de Produtos cadastrados`, `${stats.totalProdutos}`],
+    [`Produtos vencendo (≤7 dias)`, `${stats.produtosVencendo}`],
+    [`Produtos vencidos`, `${stats.produtosVencidos}`],
+    [`Contratos cumpridos`, `${stats.contratosCumpridos}/${stats.contratosAtivos} (${stats.percentualCumprimento}%)`],
+  ];
+  resumoLinhas.forEach(([label, val]) => {
+    checkPageBreak();
+    doc.setFont(undefined, 'normal');
+    doc.text(`•  ${label}:`, marginX + 2, y);
+    doc.setFont(undefined, 'bold');
+    doc.text(`${val}`, marginX + 95, y);
+    doc.setFont(undefined, 'normal');
+    y += 6;
+  });
+  y += 4;
+
+  // ── ESTOQUE ──
+  const renderEstoquePDF = (titulo, emoji, dados) => {
+    tituloSecao(titulo, emoji);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    checkPageBreak();
+    doc.text(`TOTAL GERAL:  ${dados.totalFardos} fardos  +  ${dados.totalSoltas} unidades soltas`, marginX + 2, y);
+    y += 8;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...corMuted);
+    doc.text('PRODUTOS', marginX + 2, y);
+    doc.setTextColor(0, 0, 0);
+    y += 5;
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9.5);
+    if (!dados.itens.length) {
+      doc.setTextColor(...corMuted);
+      doc.text('Nenhum item em estoque.', marginX + 2, y);
+      doc.setTextColor(0, 0, 0);
+      y += 6;
+    }
+    dados.itens.forEach(item => {
+      checkPageBreak();
+      const desc = item.temFardo
+        ? `${item.fardos} fardo(s) + ${item.soltas} unidade(s) solta(s)`
+        : `${item.soltas} unidade(s)`;
+      doc.text(`🍺 ${item.nome}`, marginX + 4, y);
+      doc.setTextColor(...corMuted);
+      doc.text(desc, marginX + 95, y);
+      doc.setTextColor(0, 0, 0);
+      y += 5.5;
+    });
+    y += 4;
+  };
+
+  renderEstoquePDF('ESTOQUE — LOJA', '🏪', agruparEstoquePorProduto(estoqueLojaList));
+  renderEstoquePDF('ESTOQUE — DEPÓSITO', '🏢', agruparEstoquePorProduto(estoqueDepositoList));
+
+  // ── CONTRATOS ──
+  tituloSecao('CONTRATOS', '📋');
+  doc.setFontSize(9.5);
+  if (!contratos.length) {
+    doc.setTextColor(...corMuted);
+    doc.text('Nenhum contrato cadastrado.', marginX + 2, y);
+    doc.setTextColor(0, 0, 0);
+    y += 6;
+  }
+  contratos.forEach(c => {
+    checkPageBreak(10);
+    const pct = c.percentual_contratado > 0 ? Math.round((c.percentual_atual / c.percentual_contratado) * 100) : 0;
+    const cor = pct >= 100 ? corVerde : pct >= 70 ? corAmarelo : corVermelho;
+    doc.setFont(undefined, 'bold');
+    doc.text(`${c.nome}`, marginX + 2, y);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(...corMuted);
+    doc.text(`(${c.tipo})`, marginX + 2 + doc.getTextWidth(`${c.nome} `), y);
+    doc.setTextColor(...cor);
+    doc.setFont(undefined, 'bold');
+    doc.text(`${pct}%`, pageW - marginX - 12, y);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+    y += 4.5;
+    doc.setFontSize(8.5);
+    doc.setTextColor(...corMuted);
+    doc.text(`Meta: ${c.percentual_contratado}%  ·  Realizado: ${(c.percentual_atual || 0).toFixed(1)}%  ·  Status: ${c.status}`, marginX + 4, y);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9.5);
+    y += 6;
+  });
+  y += 2;
+
+  // ── VALIDADES ──
+  tituloSecao('VALIDADES', '⏰');
+  const gruposValidade = agruparValidadesPorCategoria(validades);
+  if (!gruposValidade.length) {
+    doc.setFontSize(9.5);
+    doc.setTextColor(...corMuted);
+    doc.text('Nenhuma validade registrada.', marginX + 2, y);
+    doc.setTextColor(0, 0, 0);
+    y += 6;
+  }
+  gruposValidade.forEach(grupo => {
+    checkPageBreak(10);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...corPrimaria);
+    doc.text(`🍺 ${grupo.categoria}`, marginX + 2, y);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9.5);
+    y += 6;
+    grupo.itens.forEach(v => {
+      checkPageBreak();
+      const { status, dias } = verificarValidadeStatus(v.data_validade);
+      const cor = status === 'vencido' ? corVermelho : status === 'vencendo' ? corAmarelo : corVerde;
+      const icon = status === 'vencido' ? '🔴' : status === 'vencendo' ? '🟡' : '🟢';
+      doc.text(`${icon} ${v.produtos.nome}${v.quantidade > 1 ? ` (×${v.quantidade})` : ''}`, marginX + 4, y);
+      doc.setTextColor(...cor);
+      doc.text(`Validade: ${formatarData(v.data_validade)}`, marginX + 95, y);
+      doc.setTextColor(0, 0, 0);
+      y += 5.5;
+    });
+    y += 3;
+  });
+
+  doc.save(`relatorio-ambev-${new Date().getTime()}.pdf`);
+}
+
+// ========== MENSAGEM WHATSAPP ==========
+async function gerarMensagemWhatsApp() {
+  const stats = await obterEstatisticas();
+  const contratos = await listarContratos();
+  const validades = await listarValidadesDB();
+  const estoqueLojaList = await listarEstoqueLojaCompleto();
+  const estoqueDepositoList = await listarEstoqueDepositoCompleto();
+
+  const lojaAgrupada = agruparEstoquePorProduto(estoqueLojaList);
+  const depositoAgrupada = agruparEstoquePorProduto(estoqueDepositoList);
+  const gruposValidade = agruparValidadesPorCategoria(validades);
+
+  let mensagem = '📊 *RELATÓRIO DE CONTROLE - AmBev*\n';
+  mensagem += '━━━━━━━━━━━━━━━━━━━━\n';
+  mensagem += `📅 ${new Date().toLocaleDateString('pt-BR')}  ⏰ ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n\n`;
+
+  // ── ESTOQUE ──
+  mensagem += '📦 *ESTOQUE*\n\n';
+
+  const blocoEstoque = (titulo, dados) => {
+    let bloco = `${titulo}\n`;
+    bloco += `*TOTAL:* ${dados.totalFardos} fardos, ${dados.totalSoltas} unidades soltas\n\n`;
+    bloco += `_Produtos:_\n`;
+    if (!dados.itens.length) {
+      bloco += '  — nenhum item —\n';
+    } else {
+      dados.itens.forEach(item => {
+        const desc = item.temFardo
+          ? `${item.fardos} fardos, ${item.soltas} unidades soltas`
+          : `${item.soltas} unidades`;
+        bloco += `🍺 ${item.nome}: ${desc}\n`;
+      });
+    }
+    return bloco + '\n';
+  };
+
+  mensagem += blocoEstoque('🏪 *LOJA*', lojaAgrupada);
+  mensagem += blocoEstoque('🏢 *DEPÓSITO*', depositoAgrupada);
+
+  // ── CONTRATOS ──
+  mensagem += '📋 *CONTRATOS*\n';
+  mensagem += `✅ Cumpridos: ${stats.contratosCumpridos}/${stats.contratosAtivos}  ·  📊 Taxa: ${stats.percentualCumprimento}%\n\n`;
+  contratos.forEach(c => {
+    if (c.status === 'ativo') {
+      const cumprimento = c.percentual_contratado > 0 ? Math.round((c.percentual_atual / c.percentual_contratado) * 100) : 0;
+      const emoji = cumprimento >= 100 ? '✅' : cumprimento >= 70 ? '⚠️' : '🔴';
+      mensagem += `${emoji} ${c.nome}: ${cumprimento}%\n`;
+    }
+  });
+
+  // ── VALIDADES ──
+  mensagem += '\n⏰ *VALIDADES*\n';
+  if (!gruposValidade.length) {
+    mensagem += '_Nenhuma validade registrada_\n';
+  } else {
+    gruposValidade.forEach(grupo => {
+      mensagem += `\n🍺 *${grupo.categoria}*\n`;
+      grupo.itens.forEach(v => {
+        const { status, dias } = verificarValidadeStatus(v.data_validade);
+        const icon = status === 'vencido' ? '🔴' : status === 'vencendo' ? '🟡' : '🟢';
+        const extra = status === 'vencido' ? ` (vencido há ${Math.abs(dias)}d)` : status === 'vencendo' ? ` (${dias}d restantes)` : '';
+        mensagem += `${icon} ${v.produtos.nome}${v.quantidade > 1 ? ` (×${v.quantidade})` : ''} — Validade: ${formatarData(v.data_validade)}${extra}\n`;
+      });
+    });
+  }
+
+  // ── FALTANDO NA LOJA ──
+  const produtosFaltando = estoqueLojaList.filter(e => e.quantidade === 0);
+  if (produtosFaltando.length > 0) {
+    mensagem += '\n❌ *FALTANDO NA LOJA*\n';
+    produtosFaltando.forEach(p => {
+      mensagem += `  • ${p.produtos.nome}\n`;
+    });
+  }
+
+  mensagem += '\n━━━━━━━━━━━━━━━━━━━━\n';
+  mensagem += '✨ Relatório gerado automaticamente';
+
+  return mensagem;
+}
+
+// ========== COPIAR PARA ÁREA DE TRANSFERÊNCIA ==========
+async function copiarMensagemWhatsApp() {
+  const mensagem = await gerarMensagemWhatsApp();
+  navigator.clipboard.writeText(mensagem).then(() => {
+    mostrarNotificacao('✓ Mensagem copiada para área de transferência!', 'success');
+  }).catch(() => {
+    mostrarNotificacao('✗ Erro ao copiar', 'error');
+  });
+}
+
+function mostrarNotificacao(mensagem, tipo = 'info') {
+  const notif = document.createElement('div');
+  notif.className = `fixed top-4 right-4 p-4 rounded-lg text-white font-semibold notification-${tipo} z-50`;
+  notif.textContent = mensagem;
+  
+  if (tipo === 'success') notif.style.backgroundColor = '#10b981';
+  if (tipo === 'error') notif.style.backgroundColor = '#ef4444';
+  if (tipo === 'info') notif.style.backgroundColor = '#3b82f6';
+  
+  document.body.appendChild(notif);
+  
+  setTimeout(() => notif.remove(), 3000);
+}
+
+</script>
+<script>
+
+// ── NAV ──
+function ativarPagina(pagina) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('[data-page]').forEach(b => b.classList.remove('active'));
+  document.getElementById(pagina).classList.add('active');
+  document.querySelectorAll(`[data-page="${pagina}"]`).forEach(b => b.classList.add('active'));
+  carregarDadosPagina(pagina);
+}
+
+async function carregarDadosPagina(pagina) {
+  try {
+    if (pagina === 'dashboard') await atualizarDashboard();
+    else if (pagina === 'produtos') await atualizarListaProdutos();
+    else if (pagina === 'estoque') await atualizarEstoques();
+    else if (pagina === 'validades') { await atualizarListaValidades(); await preencherSelectProdutosValidades(); }
+    else if (pagina === 'contratos') await atualizarListaContratos();
+  } catch(e) { console.error('Erro ao carregar página:', e); }
+}
+
+// ── DASHBOARD ──
+async function atualizarDashboard() {
+  const [stats, contratos, validades] = await Promise.all([
+    obterEstatisticas(), listarContratos(), listarValidadesDB()
+  ]);
+
+  document.getElementById('totalProdutos').textContent = stats.totalProdutos;
+  document.getElementById('estoqueLojaQtd').textContent = stats.estoqueLojaQtd;
+  document.getElementById('estoqueDepositoQtd').textContent = stats.estoqueDepositoQtd;
+  document.getElementById('produtosVencendo').textContent = stats.produtosVencendo;
+  document.getElementById('produtosVencidos').textContent = stats.produtosVencidos;
+  document.getElementById('percentualCumprimento').textContent = stats.percentualCumprimento + '%';
+
+  // Contratos
+  const ativos = contratos.filter(c => c.status === 'ativo');
+  let html = '';
+  ativos.forEach(c => {
+    const pct = c.percentual_contratado > 0 ? Math.round((c.percentual_atual / c.percentual_contratado) * 100) : 0;
+    const ok = pct >= 100;
+    html += `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:600">${c.nome}</span>
+          <span class="badge ${ok ? 'badge-ok' : 'badge-warn'}">${pct}%</span>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill ${ok?'full':''}" style="width:${Math.min(pct,100)}%"></div></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Meta ${c.percentual_contratado}% · Realizado ${c.percentual_atual.toFixed(1)}%</div>
+      </div>`;
+  });
+  document.getElementById('contratosList').innerHTML = html || '<div class="empty">Nenhum contrato ativo</div>';
+
+  // Vencimentos
+  const hoje = new Date();
+  const em7 = new Date(); em7.setDate(em7.getDate() + 7);
+  const vencidos = validades.filter(v => new Date(v.data_validade) < hoje);
+  const vencendo = validades.filter(v => { const d = new Date(v.data_validade); return d >= hoje && d <= em7; });
+  html = '';
+  vencidos.forEach(v => {
+    html += `<div class="val-card red"><div class="item-body"><div class="item-name">${v.produtos.nome}${v.quantidade > 1 ? ` ×${v.quantidade}` : ''}</div><div class="item-sub">🔴 Vencido em ${formatarData(v.data_validade)}</div></div></div>`;
+  });
+  vencendo.forEach(v => {
+    const { dias } = verificarValidadeStatus(v.data_validade);
+    html += `<div class="val-card yellow"><div class="item-body"><div class="item-name">${v.produtos.nome}${v.quantidade > 1 ? ` ×${v.quantidade}` : ''}</div><div class="item-sub">⚠️ Vence em ${dias} dia(s) — ${formatarData(v.data_validade)}</div></div></div>`;
+  });
+  document.getElementById('proximosVencimentos').innerHTML = html || '<div class="empty">Nenhum vencimento próximo ✓</div>';
+}
+
+// ── PRODUTOS ──
+async function adicionarProdutoUI() {
+  const nome = document.getElementById('nomeProduto').value.trim();
+  const marca = document.getElementById('marcaProduto').value.trim();
+  const categoria = document.getElementById('categoriaProduto').value.trim();
+  const unidadesPorFardo = parseInt(document.getElementById('unidadesPorFardoProduto').value) || 1;
+  const qtdLoja = parseInt(document.getElementById('qtdLojaInicial').value) || 0;
+  const qtdDeposito = parseInt(document.getElementById('qtdDepositoInicial').value) || 0;
+  if (!nome || !marca) { notif('Preencha nome e marca', 'error'); return; }
+  try {
+    const p = await adicionarProduto(nome, marca, categoria || null, unidadesPorFardo);
+    if (qtdLoja > 0) await atualizarEstoqueLojaDB(p.id, qtdLoja);
+    if (qtdDeposito > 0) await atualizarEstoqueDepositoDB(p.id, qtdDeposito);
+    notif('Produto adicionado!', 'success');
+    ['nomeProduto','marcaProduto','categoriaProduto'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('unidadesPorFardoProduto').value = '1';
+    document.getElementById('qtdLojaInicial').value = '0';
+    document.getElementById('qtdDepositoInicial').value = '0';
+    await atualizarListaProdutos();
+  } catch(e) { notif('Erro ao adicionar', 'error'); }
+}
+
+async function atualizarListaProdutos() {
+  try {
+    const produtos = await listarProdutos();
+    if (!produtos.length) { document.getElementById('listaProdutos').innerHTML = '<div class="empty">Nenhum produto cadastrado</div>'; return; }
+    let html = '<div class="item-list">';
+    produtos.forEach(p => {
+      html += `
+        <div class="item">
+          <div class="item-body">
+            <div class="item-name">${p.nome}</div>
+            <div class="item-sub">${p.marca}${p.categoria ? ' · ' + p.categoria : ''}${p.unidades_por_fardo > 1 ? ' · 📦 ' + p.unidades_por_fardo + ' un/fardo' : ''}</div>
+          </div>
+          <div class="item-actions">
+            <button onclick="abrirModalEditarProduto(${p.id})" class="btn btn-secondary btn-sm" title="Editar">✏️</button>
+            <button onclick="deletarProdutoUI(${p.id})" class="btn btn-danger btn-sm">🗑 Deletar</button>
+          </div>
+        </div>`;
+    });
+    html += '</div>';
+    document.getElementById('listaProdutos').innerHTML = html;
+  } catch(e) { console.error(e); }
+}
+
+async function deletarProdutoUI(id) {
+  if (!confirm('Deletar este produto?')) return;
+  await deletarProduto(id); notif('Produto deletado', 'success'); await atualizarListaProdutos();
+}
+
+// ── EDITAR PRODUTO ──
+async function abrirModalEditarProduto(id) {
+  try {
+    const produtos = await listarProdutos();
+    const p = produtos.find(x => x.id === id);
+    if (!p) { notif('Produto não encontrado', 'error'); return; }
+    document.getElementById('editProdutoId').value = p.id;
+    document.getElementById('editProdutoNome').value = p.nome;
+    document.getElementById('editProdutoMarca').value = p.marca;
+    document.getElementById('editProdutoCategoria').value = p.categoria || '';
+    document.getElementById('editProdutoUnidadesPorFardo').value = p.unidades_por_fardo || 1;
+    document.getElementById('modalEditarProduto').classList.add('active');
+  } catch (e) { console.error(e); notif('Erro ao carregar produto', 'error'); }
+}
+
+function fecharModalEditarProduto() {
+  document.getElementById('modalEditarProduto').classList.remove('active');
+}
+
+let _editProdutoSalvando = false;
+async function salvarEditProduto() {
+  if (_editProdutoSalvando) return;
+  const id = parseInt(document.getElementById('editProdutoId').value);
+  const nome = document.getElementById('editProdutoNome').value.trim();
+  const marca = document.getElementById('editProdutoMarca').value.trim();
+  const categoria = document.getElementById('editProdutoCategoria').value.trim();
+  const unidadesPorFardo = parseInt(document.getElementById('editProdutoUnidadesPorFardo').value) || 1;
+  if (!nome || !marca) { notif('Preencha nome e marca', 'error'); return; }
+
+  _editProdutoSalvando = true;
+  const btn = document.getElementById('btnSalvarEditProduto');
+  btn.disabled = true;
+  try {
+    await atualizarProduto(id, nome, marca, categoria || null, unidadesPorFardo);
+    notif('Produto atualizado!', 'success');
+    fecharModalEditarProduto();
+    await atualizarListaProdutos();
+  } catch (e) { console.error(e); notif('Erro ao salvar produto', 'error'); }
+  finally { _editProdutoSalvando = false; btn.disabled = false; }
+}
+
+// ── ESTOQUES ──
+async function atualizarEstoques() {
+  const renderEstoque = (list, containerId, updateFn, decreaseFn) => {
+    if (!list.length) { document.getElementById(containerId).innerHTML = '<div class="empty">Nenhum item</div>'; return; }
+    let html = '';
+    list.forEach(e => {
+      const cls = e.quantidade === 0 ? 'badge-bad' : e.quantidade < 5 ? 'badge-warn' : 'badge-ok';
+      html += `
+        <div class="stock-card">
+          <div class="stock-body">
+            <div class="stock-name">${e.produtos.nome}</div>
+            <div class="stock-brand">${e.produtos.marca}</div>
+          </div>
+          <div class="stock-controls">
+            <button class="qty-btn" onclick="${decreaseFn}(${e.produto_id})">−</button>
+            <div class="qty-display"><span class="badge ${cls}">${e.quantidade}</span></div>
+            <button class="qty-btn" onclick="${updateFn}(${e.produto_id})">＋</button>
+          </div>
+        </div>`;
+    });
+    document.getElementById(containerId).innerHTML = html;
+  };
+
+  const [loja, deposito] = await Promise.all([listarEstoqueLojaCompleto(), listarEstoqueDepositoCompleto()]);
+  renderEstoque(loja, 'estoqueLojaUI', 'aumentarEstoqueLojaUI', 'diminuirEstoqueLojaUI');
+  renderEstoque(deposito, 'estoqueDepositoUI', 'aumentarEstoqueDepositoUI', 'diminuirEstoqueDepositoUI');
+}
+
+async function aumentarEstoqueLojaUI(id) { const e = await obterEstoqueLojaDB(id); await atualizarEstoqueLojaDB(id, e.quantidade+1); await atualizarEstoques(); }
+async function diminuirEstoqueLojaUI(id) { const e = await obterEstoqueLojaDB(id); if(e.quantidade>0){ await atualizarEstoqueLojaDB(id, e.quantidade-1); await atualizarEstoques(); } }
+async function aumentarEstoqueDepositoUI(id) { const e = await obterEstoqueDepositoDB(id); await atualizarEstoqueDepositoDB(id, e.quantidade+1); await atualizarEstoques(); }
+async function diminuirEstoqueDepositoUI(id) { const e = await obterEstoqueDepositoDB(id); if(e.quantidade>0){ await atualizarEstoqueDepositoDB(id, e.quantidade-1); await atualizarEstoques(); } }
+
+// ── VALIDADES ──
+async function preencherSelectProdutosValidades() {
+  const produtos = await listarProdutos();
+  let html = '<option value="">Selecione um produto…</option>';
+  produtos.forEach(p => html += `<option value="${p.id}">${p.nome} — ${p.marca}</option>`);
+  document.getElementById('produtoValidadeSelect').innerHTML = html;
+}
+
+let _validadeEnviando = false;
+async function adicionarValidadeUI() {
+  if (_validadeEnviando) return;
+  const id = parseInt(document.getElementById('produtoValidadeSelect').value);
+  const data = document.getElementById('dataValidadeInput').value;
+  const qtd = parseInt(document.getElementById('qtdValidadeInput').value) || 1;
+  if (!id || !data) { notif('Preencha todos os campos', 'error'); return; }
+  _validadeEnviando = true;
+  try {
+    await adicionarValidade(id, data, qtd);
+    notif('Validade registrada!', 'success');
+    document.getElementById('produtoValidadeSelect').value = '';
+    document.getElementById('dataValidadeInput').value = '';
+    document.getElementById('qtdValidadeInput').value = '1';
+    await atualizarListaValidades();
+  } catch(e) { notif('Erro ao registrar', 'error'); }
+  finally { _validadeEnviando = false; }
+}
+
+async function atualizarListaValidades() {
+  try {
+    const validades = await listarValidadesDB();
+    if (!validades.length) { document.getElementById('listaValidades').innerHTML = '<div class="empty">Nenhuma validade registrada</div>'; return; }
+    let html = '';
+    validades.forEach(v => {
+      const { status, cor, dias } = verificarValidadeStatus(v.data_validade);
+      const badge = cor==='red' ? 'badge-bad' : cor==='yellow' ? 'badge-warn' : 'badge-ok';
+      const icon = status==='vencido' ? '❌' : status==='vencendo' ? '⚠️' : '✓';
+      html += `
+        <div class="val-card ${cor}">
+          <div class="item-body">
+            <div class="item-name">${v.produtos.nome}</div>
+            <div class="item-sub">${formatarData(v.data_validade)} · ${v.quantidade} un · ${dias} dia(s)</div>
+          </div>
+          <div class="item-actions">
+            <span class="badge ${badge}">${icon}</span>
+            <button onclick="abrirModalEditarValidade(${v.id})" class="btn btn-secondary btn-sm" title="Editar">✏️</button>
+            <button onclick="deletarValidadeUI(${v.id})" class="btn btn-danger btn-sm">🗑</button>
+          </div>
+        </div>`;
+    });
+    document.getElementById('listaValidades').innerHTML = html;
+  } catch(e) { console.error(e); }
+}
+
+async function deletarValidadeUI(id) {
+  if (!confirm('Deletar este registro?')) return;
+  await deletarValidade(id); notif('Deletado', 'success'); await atualizarListaValidades();
+}
+
+// ── EDITAR VALIDADE ──
+async function abrirModalEditarValidade(id) {
+  try {
+    const [validades, produtos] = await Promise.all([listarValidadesDB(), listarProdutos()]);
+    const v = validades.find(x => x.id === id);
+    if (!v) { notif('Registro não encontrado', 'error'); return; }
+
+    const select = document.getElementById('editValidadeProdutoSelect');
+    select.innerHTML = produtos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+    select.value = v.produto_id;
+
+    document.getElementById('editValidadeId').value = v.id;
+    document.getElementById('editValidadeData').value = v.data_validade;
+    document.getElementById('editValidadeQtd').value = v.quantidade || 1;
+    document.getElementById('modalEditarValidade').classList.add('active');
+  } catch (e) { console.error(e); notif('Erro ao carregar validade', 'error'); }
+}
+
+function fecharModalEditarValidade() {
+  document.getElementById('modalEditarValidade').classList.remove('active');
+}
+
+let _editValidadeSalvando = false;
+async function salvarEditValidade() {
+  if (_editValidadeSalvando) return;
+  const id = parseInt(document.getElementById('editValidadeId').value);
+  const produtoId = parseInt(document.getElementById('editValidadeProdutoSelect').value);
+  const data = document.getElementById('editValidadeData').value;
+  const qtd = parseInt(document.getElementById('editValidadeQtd').value) || 1;
+  if (!produtoId || !data) { notif('Preencha todos os campos', 'error'); return; }
+
+  _editValidadeSalvando = true;
+  const btn = document.getElementById('btnSalvarEditValidade');
+  btn.disabled = true;
+  try {
+    await atualizarValidade(id, produtoId, data, qtd);
+    notif('Validade atualizada!', 'success');
+    fecharModalEditarValidade();
+    await atualizarListaValidades();
+  } catch (e) { console.error(e); notif('Erro ao salvar validade', 'error'); }
+  finally { _editValidadeSalvando = false; btn.disabled = false; }
+}
+
+async function deletarTodasValidadesUI() {
+  const validades = await listarValidadesDB();
+  if (!validades.length) { notif('Não há validades para excluir', 'error'); return; }
+  if (!confirm(`Excluir TODAS as ${validades.length} validades cadastradas? Essa ação não pode ser desfeita.`)) return;
+  if (!confirm('Tem certeza mesmo? Todos os registros de validade serão apagados permanentemente.')) return;
+  try {
+    await deletarTodasValidades();
+    notif('Todas as validades foram excluídas', 'success');
+    await atualizarListaValidades();
+  } catch (e) {
+    console.error(e);
+    notif('Erro ao excluir validades', 'error');
+  }
+}
+
+// ── CONTRATOS ──
+async function adicionarContratoUI() {
+  const nome = document.getElementById('nomeContrato').value.trim();
+  const tipo = document.getElementById('tipoContrato').value;
+  const meta = parseFloat(document.getElementById('percentualContratado').value);
+  const atual = parseFloat(document.getElementById('percentualAtualNovo').value) || 0;
+  if (!nome || !tipo || isNaN(meta)) { notif('Preencha nome, tipo e % meta', 'error'); return; }
+  try {
+    await adicionarContrato(nome, meta, atual, tipo, 'ativo');
+    notif('Contrato adicionado!', 'success');
+    ['nomeContrato','percentualContratado'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tipoContrato').value = '';
+    document.getElementById('percentualAtualNovo').value = '0';
+    await atualizarListaContratos();
+  } catch(e) { notif('Erro ao adicionar', 'error'); }
+}
+
+async function atualizarListaContratos() {
+  try {
+    const contratos = await listarContratos();
+    if (!contratos.length) { document.getElementById('listaContratos').innerHTML = '<div class="empty">Nenhum contrato cadastrado</div>'; return; }
+    let html = '';
+    contratos.forEach(c => {
+      const pct = c.percentual_contratado > 0 ? Math.round((c.percentual_atual / c.percentual_contratado) * 100) : 0;
+      const ok = pct >= 100;
+      html += `
+        <div class="contract-card">
+          <div class="contract-header">
+            <div>
+              <div class="contract-title">${c.nome}</div>
+              <div class="contract-tipo">${c.tipo}</div>
+            </div>
+            <span class="badge ${ok ? 'badge-ok' : pct >= 70 ? 'badge-warn' : 'badge-bad'}">${pct}% da meta</span>
+          </div>
+          <div class="progress-labels">
+            <span>🎯 Meta: ${c.percentual_contratado}%</span>
+            <span>📊 Realizado: ${(c.percentual_atual || 0).toFixed(1)}%</span>
+          </div>
+          <div class="progress-bar-bg" style="height:8px">
+            <div class="progress-bar-fill ${ok?'full':''}" style="width:${Math.min(pct,100)}%"></div>
+          </div>
+          <div class="contract-edit-area" id="edit-area-${c.id}">
+            <label class="form-label" style="margin-bottom:6px">Novo % Realizado</label>
+            <input type="number" id="input-${c.id}" value="${c.percentual_atual}" step="0.1" min="0" max="100" style="margin-bottom:8px">
+            <button onclick="salvarEdicaoContrato(${c.id})" class="btn btn-primary btn-sm">💾 Salvar</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button onclick="toggleEditarContrato(${c.id})" class="btn btn-secondary btn-sm">✏️ Editar</button>
+            <button onclick="deletarContratoUI(${c.id})" class="btn btn-danger btn-sm">🗑 Deletar</button>
+          </div>
+        </div>`;
+    });
+    document.getElementById('listaContratos').innerHTML = html;
+  } catch(e) { console.error(e); }
+}
+
+function toggleEditarContrato(id) {
+  const el = document.getElementById(`edit-area-${id}`);
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+
+async function salvarEdicaoContrato(id) {
+  const val = parseFloat(document.getElementById(`input-${id}`).value);
+  if (isNaN(val)) { notif('Valor inválido', 'error'); return; }
+  try { await atualizarContrato(id, val, 'ativo'); notif('Contrato atualizado!', 'success'); await atualizarListaContratos(); }
+  catch(e) { notif('Erro ao salvar', 'error'); }
+}
+
+async function deletarContratoUI(id) {
+  if (!confirm('Deletar este contrato?')) return;
+  await deletarContrato(id); notif('Contrato deletado', 'success'); await atualizarListaContratos();
+}
+
+// ── CALCULADORA ──
+function calcularFormula() {
+  const qtd = parseFloat(document.getElementById('calcQuantidade').value);
+  const pct = parseFloat(document.getElementById('calcPercentual').value);
+  if (isNaN(qtd) || isNaN(pct)) { notif('Digite valores válidos', 'error'); return; }
+  document.getElementById('resultadoCalc').textContent = ((qtd * pct) / 100).toFixed(2);
+}
+
+// ── NOTIFICAÇÃO ──
+function notif(msg, tipo = 'success') {
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  const n = document.createElement('div');
+  n.className = `notif ${tipo}`;
+  n.innerHTML = `<span>${icons[tipo]||'·'}</span>${msg}`;
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 3000);
+}
+// alias para relatorios.js
+function mostrarNotificacao(msg, tipo) { notif(msg, tipo); }
+
+// ── COPIAR LISTA DE PRODUTOS (p/ preencher validades manualmente) ──
+function pluralizarCategoria(cat) {
+  const c = cat.trim();
+  if (!c) return 'Outros';
+  if (/s$/i.test(c)) return c;
+  if (/a$/i.test(c)) return c + 's';
+  if (/(r|z)$/i.test(c)) return c + 'es';
+  return c + 's';
+}
+
+async function copiarListaProdutos() {
+  try {
+    const produtos = await listarProdutos();
+    if (!produtos.length) { notif('Nenhum produto cadastrado', 'error'); return; }
+
+    const grupos = {};
+    produtos.forEach(p => {
+      const cat = p.categoria?.trim() || 'Outros';
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(p);
+    });
+
+    let texto = '';
+    Object.keys(grupos).sort().forEach(cat => {
+      texto += `${pluralizarCategoria(cat)}:\n`;
+      grupos[cat]
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .forEach(p => { texto += `${p.nome} - \n`; });
+      texto += '\n';
+    });
+
+    await navigator.clipboard.writeText(texto.trim());
+    notif('✓ Lista de produtos copiada!', 'success');
+  } catch (e) { console.error(e); notif('Erro ao copiar lista', 'error'); }
+}
+
+// ── BULK ADD VALIDADES ──
+let _bulkValidadeResultado = [];
+
+function abrirModalBulkValidade() {
+  document.getElementById('bulkValidadeInput').value = '';
+  document.getElementById('bulkValidadePreview').innerHTML = '';
+  document.getElementById('bulkValidadeInput').style.display = 'block';
+  document.getElementById('bulkValidadeFooterAnalisar').style.display = 'flex';
+  document.getElementById('bulkValidadeFooterConfirmar').style.display = 'none';
+  document.getElementById('modalBulkValidade').classList.add('active');
+}
+
+function fecharModalBulkValidade() {
+  document.getElementById('modalBulkValidade').classList.remove('active');
+}
+
+function voltarBulkValidade() {
+  document.getElementById('bulkValidadeInput').style.display = 'block';
+  document.getElementById('bulkValidadePreview').innerHTML = '';
+  document.getElementById('bulkValidadeFooterAnalisar').style.display = 'flex';
+  document.getElementById('bulkValidadeFooterConfirmar').style.display = 'none';
+}
+
+function encontrarProdutoPorTexto(texto, produtos) {
+  const t = texto.trim().toLowerCase();
+  return produtos.find(p => p.nome.toLowerCase() === t)
+    || produtos.find(p => p.marca.toLowerCase() === t)
+    || produtos.find(p => p.nome.toLowerCase().includes(t))
+    || produtos.find(p => p.marca.toLowerCase().includes(t))
+    || null;
+}
+
+async function analisarBulkValidade() {
+  const texto = document.getElementById('bulkValidadeInput').value;
+  const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!linhas.length) { notif('Cole pelo menos uma linha', 'error'); return; }
+
+  const produtos = await listarProdutos();
+  const erros = [];
+  // Agrupa por produtoId + data, somando a quantidade em vez de criar
+  // um registro repetido pra cada unidade (isso é o que causava produtos
+  // aparecendo várias vezes seguidas no relatório).
+  const agrupado = new Map(); // chave "produtoId_dataIso" -> { produtoId, dataIso, nome, qtd }
+
+  linhas.forEach(linha => {
+    const partes = linha.split(' - ');
+    if (partes.length < 2) {
+      erros.push({ ok: false, linha, motivo: 'Formato inválido (use "Produto - data, data")' });
+      return;
+    }
+    const nomeTexto = partes[0].trim();
+    const datasTexto = partes.slice(1).join(' - ').trim();
+    const produto = encontrarProdutoPorTexto(nomeTexto, produtos);
+    if (!produto) {
+      erros.push({ ok: false, linha, motivo: `Produto "${nomeTexto}" não encontrado` });
+      return;
+    }
+    const datas = datasTexto.split(',').map(d => d.trim()).filter(Boolean);
+    if (!datas.length) {
+      erros.push({ ok: false, linha, motivo: 'Nenhuma data informada' });
+      return;
+    }
+    datas.forEach(dataTexto => {
+      // Aceita "10/01/2027" (1 unidade) ou "10/01/2027 x4" (4 unidades)
+      const mMult = dataTexto.match(/^(.*?)\s*[xX]\s*(\d+)$/);
+      const dataPura = mMult ? mMult[1].trim() : dataTexto;
+      const mult = mMult ? parseInt(mMult[2]) : 1;
+      const iso = parseDataBR(dataPura);
+      if (!iso) {
+        erros.push({ ok: false, linha: `${nomeTexto} - ${dataTexto}`, motivo: `Data inválida: "${dataTexto}"` });
+        return;
+      }
+      const chave = `${produto.id}_${iso}`;
+      if (agrupado.has(chave)) {
+        agrupado.get(chave).qtd += mult;
+      } else {
+        agrupado.set(chave, { produtoId: produto.id, dataIso: iso, nome: produto.nome, qtd: mult });
+      }
+    });
+  });
+
+  const validos = Array.from(agrupado.values()).map(v => ({
+    ok: true,
+    produtoId: v.produtoId,
+    dataIso: v.dataIso,
+    quantidade: v.qtd,
+    linha: `${v.nome} — ${formatarData(v.dataIso)}${v.qtd > 1 ? ` <strong>× ${v.qtd}</strong>` : ''}`
+  }));
+
+  _bulkValidadeResultado = [...validos, ...erros];
+
+  let html = `<div style="font-size:12px;color:var(--text-muted);margin:12px 0 8px">✅ ${validos.length} registro(s) · ❌ ${erros.length} com problema</div>`;
+  _bulkValidadeResultado.forEach(r => {
+    html += `<div class="preview-item ${r.ok ? 'ok' : 'fail'}">
+      <span>${r.ok ? '✅' : '❌'}</span>
+      <span>${r.linha}${!r.ok ? ' — <em>' + r.motivo + '</em>' : ''}</span>
+    </div>`;
+  });
+  document.getElementById('bulkValidadePreview').innerHTML = html;
+  document.getElementById('bulkValidadeInput').style.display = 'none';
+  document.getElementById('bulkValidadeFooterAnalisar').style.display = 'none';
+  document.getElementById('bulkValidadeFooterConfirmar').style.display = 'flex';
+  document.getElementById('btnConfirmarBulkValidade').disabled = validos.length === 0;
+}
+
+let _bulkValidadeEnviando = false;
+
+async function confirmarBulkValidade() {
+  if (_bulkValidadeEnviando) return; // trava contra duplo clique / duplo envio
+  const validos = _bulkValidadeResultado.filter(r => r.ok);
+  if (!validos.length) { notif('Nada válido para adicionar', 'error'); return; }
+
+  _bulkValidadeEnviando = true;
+  const btn = document.getElementById('btnConfirmarBulkValidade');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+
+  let sucesso = 0, falha = 0;
+  for (const item of validos) {
+    try { await adicionarValidade(item.produtoId, item.dataIso, item.quantidade || 1); sucesso++; }
+    catch (e) { falha++; }
+  }
+
+  notif(`✓ ${sucesso} registro(s) adicionado(s)${falha ? `, ${falha} falharam` : ''}`, falha ? 'error' : 'success');
+  btn.textContent = textoOriginal;
+  _bulkValidadeEnviando = false;
+  fecharModalBulkValidade();
+  await atualizarListaValidades();
+}
+
+// ── BULK UPDATE ESTOQUE (LOJA / DEPÓSITO) ──
+let _bulkEstoqueTipo = 'loja';
+let _bulkEstoqueResultado = [];
+
+function abrirModalBulkEstoque(tipo) {
+  _bulkEstoqueTipo = tipo;
+  document.getElementById('bulkEstoqueTitulo').textContent = `✏️ Atualizar Estoque em Massa — ${tipo === 'loja' ? '🏪 Loja' : '🏢 Depósito'}`;
+  document.getElementById('bulkEstoqueInput').value = '';
+  document.getElementById('bulkEstoquePreview').innerHTML = '';
+  document.getElementById('bulkEstoqueInput').style.display = 'block';
+  document.getElementById('bulkEstoqueFooterAnalisar').style.display = 'flex';
+  document.getElementById('bulkEstoqueFooterConfirmar').style.display = 'none';
+  document.getElementById('modalBulkEstoque').classList.add('active');
+}
+
+function fecharModalBulkEstoque() {
+  document.getElementById('modalBulkEstoque').classList.remove('active');
+}
+
+function voltarBulkEstoque() {
+  document.getElementById('bulkEstoqueInput').style.display = 'block';
+  document.getElementById('bulkEstoquePreview').innerHTML = '';
+  document.getElementById('bulkEstoqueFooterAnalisar').style.display = 'flex';
+  document.getElementById('bulkEstoqueFooterConfirmar').style.display = 'none';
+}
+
+// Extrai { fardos, soltas } de um texto livre tipo "88 fardos - 13 unidades soltas",
+// "20 unidades" ou "5 fardos". Retorna null se não achar nenhum número.
+function parseFardosSoltasTexto(texto) {
+  const fardosMatch = texto.match(/(\d+)\s*fard/i);
+  const soltasMatch = texto.match(/(\d+)\s*(?:unidades?\s*)?solt/i);
+  let fardos = fardosMatch ? parseInt(fardosMatch[1]) : 0;
+  let soltas = soltasMatch ? parseInt(soltasMatch[1]) : 0;
+
+  if (!fardosMatch && !soltasMatch) {
+    // fallback: "Produto - 20 unidades" (sem a palavra "solta")
+    const unidadeMatch = texto.match(/(\d+)\s*un/i);
+    if (unidadeMatch) soltas = parseInt(unidadeMatch[1]);
+    else {
+      const numMatch = texto.match(/(\d+)/);
+      if (numMatch) soltas = parseInt(numMatch[1]);
+      else return null;
+    }
+  }
+  return { fardos, soltas };
+}
+
+async function analisarBulkEstoque() {
+  const texto = document.getElementById('bulkEstoqueInput').value;
+  const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!linhas.length) { notif('Cole pelo menos uma linha', 'error'); return; }
+
+  const produtos = await listarProdutos();
+  const resultado = [];
+
+  linhas.forEach(linha => {
+    const partes = linha.split(' - ');
+    if (partes.length < 2) {
+      resultado.push({ ok: false, linha, motivo: 'Formato inválido (use "Produto - X fardos - Y unidades soltas")' });
+      return;
+    }
+    const nomeTexto = partes[0].trim();
+    const restoTexto = partes.slice(1).join(' - ').trim();
+    const produto = encontrarProdutoPorTexto(nomeTexto, produtos);
+    if (!produto) {
+      resultado.push({ ok: false, linha, motivo: `Produto "${nomeTexto}" não encontrado` });
+      return;
+    }
+    const valores = parseFardosSoltasTexto(restoTexto);
+    if (!valores) {
+      resultado.push({ ok: false, linha, motivo: 'Não consegui identificar a quantidade' });
+      return;
+    }
+    const upf = produto.unidades_por_fardo || 1;
+    const total = valores.fardos * upf + valores.soltas;
+    const descricao = valores.fardos > 0
+      ? `${valores.fardos} fardo(s) + ${valores.soltas} unidade(s) solta(s) = ${total} unidades`
+      : `${total} unidades`;
+    resultado.push({ ok: true, linha: `${produto.nome} — ${descricao}`, produtoId: produto.id, total });
+  });
+
+  _bulkEstoqueResultado = resultado;
+
+  const validos = resultado.filter(r => r.ok).length;
+  const invalidos = resultado.length - validos;
+
+  let html = `<div style="font-size:12px;color:var(--text-muted);margin:12px 0 8px">✅ ${validos} válida(s) · ❌ ${invalidos} com problema</div>`;
+  resultado.forEach(r => {
+    html += `<div class="preview-item ${r.ok ? 'ok' : 'fail'}">
+      <span>${r.ok ? '✅' : '❌'}</span>
+      <span>${r.linha}${!r.ok ? ' — <em>' + r.motivo + '</em>' : ''}</span>
+    </div>`;
+  });
+  document.getElementById('bulkEstoquePreview').innerHTML = html;
+  document.getElementById('bulkEstoqueInput').style.display = 'none';
+  document.getElementById('bulkEstoqueFooterAnalisar').style.display = 'none';
+  document.getElementById('bulkEstoqueFooterConfirmar').style.display = 'flex';
+  document.getElementById('btnConfirmarBulkEstoque').disabled = validos === 0;
+}
+
+async function confirmarBulkEstoque() {
+  const validos = _bulkEstoqueResultado.filter(r => r.ok);
+  if (!validos.length) { notif('Nada válido para atualizar', 'error'); return; }
+  const fnUpdate = _bulkEstoqueTipo === 'loja' ? atualizarEstoqueLojaDB : atualizarEstoqueDepositoDB;
+  let sucesso = 0, falha = 0;
+  for (const item of validos) {
+    try { await fnUpdate(item.produtoId, item.total); sucesso++; }
+    catch (e) { falha++; }
+  }
+  notif(`✓ ${sucesso} item(ns) atualizado(s)${falha ? `, ${falha} falharam` : ''}`, falha ? 'error' : 'success');
+  fecharModalBulkEstoque();
+  await atualizarEstoques();
+}
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', async () => {
+  const ok = await testarConexaoSupabase();
+  if (ok) await atualizarDashboard();
+  else notif('Verifique as credenciais do Supabase', 'error');
+});
+
+</script>
+</body>
+</html>
